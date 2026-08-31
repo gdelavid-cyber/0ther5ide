@@ -3,7 +3,7 @@ import { SEC_HEADERS, getOrSetCache } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import type { InsiderDossier } from "@/lib/types";
 
-export async function fetchInsiderDossier(cik: string): Promise<any> {
+async function fetchInsiderDossier(cik: string): Promise<any> {
   return getOrSetCache(`sec:dossier:${cik}`, 300, async () => {
     try {
       const paddedCik = cik.padStart(10, "0");
