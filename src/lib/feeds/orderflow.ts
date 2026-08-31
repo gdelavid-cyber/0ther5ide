@@ -1,236 +1,215 @@
-import type { OrderFlowData, OptionFlowItem, DarkPoolPrint, OrderBookLadder, FlowDecomposition } from "@/lib/types";
+import type { OrderFlowData, OptionFlowItem, DarkPoolPrint, OrderBookLadder, FlowDecomposition, OrderBookLevel } from "@/lib/types";
 
-const TICKERS = ["NVDA", "PLTR", "TSLA", "AAPL", "SPY", "QQQ", "LMT", "MSFT"];
+const EXPIRIES_2026 = ["2026-09-18", "2026-10-16", "2026-11-20", "2026-12-18", "2027-01-15"];
 
-export function generateOrderFlowData(selectedTicker: string = "NVDA"): OrderFlowData {
-  const ticker = selectedTicker.toUpperCase();
+export function generateOrderFlowData(selectedTicker: string = "NVDA", liveSpot?: number): OrderFlowData {
+  const ticker = selectedTicker.toUpperCase().replace(/[^A-Z]/g, "");
   const spotMap: Record<string, number> = {
     NVDA: 128.50,
-    PLTR: 32.40,
+    PLTR: 34.20,
     TSLA: 218.80,
     AAPL: 226.10,
-    SPY: 562.40,
-    QQQ: 480.20,
+    SPY: 564.40,
+    QQQ: 482.20,
     LMT: 565.30,
     MSFT: 448.90,
+    BTC: 78200.0,
+    ETH: 3150.0,
+    SOL: 184.0,
+    XAUUSD: 2518.0,
+    GOLD: 2518.0,
   };
-  const spot = spotMap[ticker] || 150.00;
 
-  // 1. Institutional Options Flow (Sweeps, Blocks, Golden Sweeps)
+  const spot = liveSpot && liveSpot > 0 ? liveSpot : (spotMap[ticker] || 150.0);
+  const now = Date.now();
+
+  // Dynamic Options Flow
   const optionsFlow: OptionFlowItem[] = [
     {
-      id: "flow-1",
+      id: `flow-${ticker}-1-${now}`,
       ticker,
       type: "GOLDEN_SWEEP",
-      strike: Math.round((spot * 1.06) / 5) * 5,
-      expiry: "2024-09-20",
+      strike: Math.round((spot * 1.05) / (spot > 500 ? 10 : 2.5)) * (spot > 500 ? 10 : 2.5),
+      expiry: EXPIRIES_2026[0],
       sentiment: "BULLISH",
       contractType: "CALL",
-      premium: 2450000,
+      premium: Math.round(spot * 18500),
       size: 4800,
       spotPrice: spot,
       volume: 12500,
       openInterest: 1850,
       volOiRatio: 6.75,
-      timestamp: new Date(Date.now() - 1000 * 45).toISOString(),
-      venue: "MULTI-EXCHANGE (ISE/CBOE/PHLX)",
+      timestamp: new Date(now - 1000 * 35).toISOString(),
+      venue: "MULTI-EXCHANGE (CBOE/PHLX/ISE)",
       isUnusual: true,
     },
     {
-      id: "flow-2",
+      id: `flow-${ticker}-2-${now}`,
       ticker,
       type: "SWEEP",
-      strike: Math.round((spot * 1.02) / 5) * 5,
-      expiry: "2024-09-13",
+      strike: Math.round((spot * 1.02) / (spot > 500 ? 10 : 2.5)) * (spot > 500 ? 10 : 2.5),
+      expiry: EXPIRIES_2026[1],
       sentiment: "BULLISH",
       contractType: "CALL",
-      premium: 890000,
+      premium: Math.round(spot * 8200),
       size: 1950,
       spotPrice: spot,
       volume: 4800,
       openInterest: 920,
       volOiRatio: 5.21,
-      timestamp: new Date(Date.now() - 1000 * 180).toISOString(),
+      timestamp: new Date(now - 1000 * 95).toISOString(),
       venue: "NASDAQ (NOM/BX)",
       isUnusual: true,
     },
     {
-      id: "flow-3",
-      ticker: ticker === "NVDA" ? "PLTR" : "NVDA",
+      id: `flow-${ticker}-3-${now}`,
+      ticker,
       type: "BLOCK",
-      strike: Math.round((spotMap[ticker === "NVDA" ? "PLTR" : "NVDA"] * 0.95) / 5) * 5,
-      expiry: "2024-10-18",
+      strike: Math.round((spot * 0.96) / (spot > 500 ? 10 : 2.5)) * (spot > 500 ? 10 : 2.5),
+      expiry: EXPIRIES_2026[2],
       sentiment: "BEARISH",
       contractType: "PUT",
-      premium: 1250000,
+      premium: Math.round(spot * 11500),
       size: 3200,
-      spotPrice: spotMap[ticker === "NVDA" ? "PLTR" : "NVDA"] || 32,
+      spotPrice: spot,
       volume: 5100,
       openInterest: 4200,
       volOiRatio: 1.21,
-      timestamp: new Date(Date.now() - 1000 * 320).toISOString(),
-      venue: "OFF-EXCHANGE BLOCK",
+      timestamp: new Date(now - 1000 * 210).toISOString(),
+      venue: "FINRA ADF DARK POOL",
       isUnusual: false,
     },
     {
-      id: "flow-4",
-      ticker: "SPY",
+      id: `flow-${ticker}-4-${now}`,
+      ticker,
       type: "GOLDEN_SWEEP",
-      strike: 565,
-      expiry: "2024-09-06",
+      strike: Math.round((spot * 1.08) / (spot > 500 ? 10 : 2.5)) * (spot > 500 ? 10 : 2.5),
+      expiry: EXPIRIES_2026[3],
       sentiment: "BULLISH",
       contractType: "CALL",
-      premium: 3850000,
+      premium: Math.round(spot * 26000),
       size: 7500,
-      spotPrice: 562.40,
+      spotPrice: spot,
       volume: 24000,
       openInterest: 3100,
       volOiRatio: 7.74,
-      timestamp: new Date(Date.now() - 1000 * 480).toISOString(),
+      timestamp: new Date(now - 1000 * 380).toISOString(),
       venue: "CBOE AGGRESSIVE",
       isUnusual: true,
     },
     {
-      id: "flow-5",
+      id: `flow-${ticker}-5-${now}`,
       ticker,
       type: "SWEEP",
-      strike: Math.round((spot * 0.98) / 5) * 5,
-      expiry: "2024-09-27",
+      strike: Math.round((spot * 0.98) / (spot > 500 ? 10 : 2.5)) * (spot > 500 ? 10 : 2.5),
+      expiry: EXPIRIES_2026[0],
       sentiment: "BEARISH",
       contractType: "PUT",
-      premium: 640000,
+      premium: Math.round(spot * 7400),
       size: 1400,
       spotPrice: spot,
-      volume: 2800,
-      openInterest: 1100,
-      volOiRatio: 2.54,
-      timestamp: new Date(Date.now() - 1000 * 620).toISOString(),
-      venue: "BOX INTERCEPT",
-      isUnusual: false,
-    },
-    {
-      id: "flow-6",
-      ticker: "LMT",
-      type: "GOLDEN_SWEEP",
-      strike: 580,
-      expiry: "2024-10-18",
-      sentiment: "BULLISH",
-      contractType: "CALL",
-      premium: 1780000,
-      size: 2100,
-      spotPrice: 565.30,
       volume: 3800,
-      openInterest: 450,
-      volOiRatio: 8.44,
-      timestamp: new Date(Date.now() - 1000 * 780).toISOString(),
-      venue: "PHLX DEFENSE BASKET",
-      isUnusual: true,
+      openInterest: 1600,
+      volOiRatio: 2.37,
+      timestamp: new Date(now - 1000 * 540).toISOString(),
+      venue: "BOX EXCH",
+      isUnusual: false,
     },
   ];
 
-  // 2. Dark Pool Prints & Smart Tape
+  // Dynamic Dark Pool Prints strictly matching DarkPoolPrint
   const darkPoolPrints: DarkPoolPrint[] = [
     {
-      id: "dp-1",
+      id: `dp-${ticker}-1-${now}`,
       ticker,
-      price: spot + 0.05,
-      size: 425000,
-      premium: 425000 * spot,
-      exchange: "ADF (FINRA Alternative Display)",
-      timestamp: new Date(Date.now() - 1000 * 90).toISOString(),
+      price: +(spot * 0.9992).toFixed(2),
+      size: Math.round(Math.random() * 85000 + 45000),
+      premium: Math.round(spot * 65000),
+      exchange: "FINRA ADF (Off-Exchange)",
+      timestamp: new Date(now - 1000 * 25).toISOString(),
       side: "ABOVE_ASK",
       sentiment: "BULLISH",
     },
     {
-      id: "dp-2",
+      id: `dp-${ticker}-2-${now}`,
       ticker,
-      price: spot,
-      size: 280000,
-      premium: 280000 * spot,
-      exchange: "UBS ATS (Dark Pool)",
-      timestamp: new Date(Date.now() - 1000 * 240).toISOString(),
+      price: +(spot * 1.0004).toFixed(2),
+      size: Math.round(Math.random() * 120000 + 80000),
+      premium: Math.round(spot * 105000),
+      exchange: "IEX ATS DARK CROSS",
+      timestamp: new Date(now - 1000 * 85).toISOString(),
       side: "MID",
+      sentiment: "BULLISH",
+    },
+    {
+      id: `dp-${ticker}-3-${now}`,
+      ticker,
+      price: +(spot * 0.9985).toFixed(2),
+      size: Math.round(Math.random() * 45000 + 30000),
+      premium: Math.round(spot * 38000),
+      exchange: "UBS ATS PINS",
+      timestamp: new Date(now - 1000 * 190).toISOString(),
+      side: "BELOW_BID",
       sentiment: "NEUTRAL",
     },
     {
-      id: "dp-3",
-      ticker: "TSLA",
-      price: 218.80,
-      size: 510000,
-      premium: 510000 * 218.80,
-      exchange: "Crossfinder (Credit Suisse Dark)",
-      timestamp: new Date(Date.now() - 1000 * 410).toISOString(),
+      id: `dp-${ticker}-4-${now}`,
+      ticker,
+      price: +(spot * 1.0012).toFixed(2),
+      size: Math.round(Math.random() * 190000 + 110000),
+      premium: Math.round(spot * 150000),
+      exchange: "CITADEL CONNECT CROSS",
+      timestamp: new Date(now - 1000 * 310).toISOString(),
       side: "ABOVE_ASK",
       sentiment: "BULLISH",
     },
-    {
-      id: "dp-4",
-      ticker: "SPY",
-      price: 562.38,
-      size: 890000,
-      premium: 890000 * 562.38,
-      exchange: "Intelligent Cross (ASPM)",
-      timestamp: new Date(Date.now() - 1000 * 580).toISOString(),
-      side: "BELOW_BID",
-      sentiment: "BEARISH",
-    },
   ];
 
-  // 3. Depth-of-Book / Level 2 DOM Ladder (Nasdaq TotalView Style)
-  const bids = [];
-  const asks = [];
-  let bidAccum = 0;
-  let askAccum = 0;
+  const totalSweepVolume = optionsFlow.reduce((sum, f) => sum + f.premium, 0);
+  const bullishSweepVol = optionsFlow.filter((f) => f.sentiment === "BULLISH").reduce((sum, f) => sum + f.premium, 0);
+  const bullishFlowPercent = Math.round((bullishSweepVol / (totalSweepVolume || 1)) * 100);
+  const darkPoolTotalValue = darkPoolPrints.reduce((sum, d) => sum + d.premium, 0);
 
-  for (let i = 1; i <= 10; i++) {
-    const bPrice = +(spot - i * 0.05).toFixed(2);
-    const bSize = Math.round(1500 + Math.sin(i * 1.5) * 800 + (i === 3 ? 4500 : 0));
-    bidAccum += bSize;
-    bids.push({
-      price: bPrice,
-      size: bSize,
-      total: bidAccum,
-      delta: bSize - 1200,
-      isImbalance: i === 3,
-    });
+  const bids: OrderBookLevel[] = Array.from({ length: 8 }, (_, i) => ({
+    price: +(spot - (i + 1) * (spot * 0.001)).toFixed(2),
+    size: Math.round(Math.random() * 3000 + 800),
+    total: Math.round((i + 1) * 2800),
+    delta: Math.round(Math.random() * 400 - 150),
+    isImbalance: i === 1,
+  }));
 
-    const aPrice = +(spot + i * 0.05).toFixed(2);
-    const aSize = Math.round(1300 + Math.cos(i * 1.4) * 600 + (i === 6 ? 3800 : 0));
-    askAccum += aSize;
-    asks.push({
-      price: aPrice,
-      size: aSize,
-      total: askAccum,
-      delta: aSize - 1200,
-      isImbalance: i === 6,
-    });
-  }
+  const asks: OrderBookLevel[] = Array.from({ length: 8 }, (_, i) => ({
+    price: +(spot + (i + 1) * (spot * 0.001)).toFixed(2),
+    size: Math.round(Math.random() * 2800 + 750),
+    total: Math.round((i + 1) * 2600),
+    delta: Math.round(Math.random() * 400 - 150),
+    isImbalance: false,
+  }));
+
+  const bidDepthTotal = bids.reduce((acc, b) => acc + b.size, 0);
+  const askDepthTotal = asks.reduce((acc, a) => acc + a.size, 0);
 
   const orderBook: OrderBookLadder = {
     ticker,
     currentPrice: spot,
     bids,
     asks,
-    spread: 0.02,
-    bidDepthTotal: bidAccum,
-    askDepthTotal: askAccum,
-    imbalanceRatio: +(bidAccum / (askAccum || 1)).toFixed(2),
+    spread: +(spot * 0.0004).toFixed(2),
+    bidDepthTotal,
+    askDepthTotal,
+    imbalanceRatio: +(bidDepthTotal / (askDepthTotal || 1)).toFixed(2),
   };
 
-  // 4. BMLL XTech Institutional Decomposition
   const decomposition: FlowDecomposition = {
     ticker,
-    institutionalDominance: 84.6, // 84.6% explained by institutional positioning
-    institutionalNetDelta: +1854000,
-    retailShare: 9.8,
-    hftShare: 5.6,
-    darkPoolVolumeRatio: 58.4, // 58.4% volume executed off-exchange
+    institutionalDominance: 78.4,
+    institutionalNetDelta: +184500,
+    retailShare: 21.6,
+    hftShare: 42.1,
+    darkPoolVolumeRatio: 62.4,
     gammaExposureGEX: "POSITIVE_GAMMA",
     verdict: "STRONG_INSTITUTIONAL_ACCUMULATION",
   };
-
-  const totalSweepVolume = optionsFlow.reduce((sum, f) => sum + f.premium, 0);
-  const bullishVol = optionsFlow.filter(f => f.sentiment === "BULLISH").reduce((sum, f) => sum + f.premium, 0);
 
   return {
     optionsFlow,
@@ -239,9 +218,9 @@ export function generateOrderFlowData(selectedTicker: string = "NVDA"): OrderFlo
     decomposition,
     summary: {
       totalSweepVolume,
-      bullishFlowPercent: Math.round((bullishVol / (totalSweepVolume || 1)) * 100),
-      darkPoolTotalValue: darkPoolPrints.reduce((sum, d) => sum + d.premium, 0),
-      topActiveTickers: TICKERS,
+      bullishFlowPercent,
+      darkPoolTotalValue,
+      topActiveTickers: ["NVDA", "TSLA", "SPY", "BTC", "PLTR", "AAPL"],
       updatedAt: new Date().toISOString(),
     },
   };

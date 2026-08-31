@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import TradeExecutionModal from "@/components/trading/TradeExecutionModal";
+import PaywallModal from "@/components/pricing/PaywallModal";
 
 interface Candle {
   time: string;
@@ -48,6 +49,15 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [showExecutionModal, setShowExecutionModal] = useState<boolean>(false);
+  const [paywallFeature, setPaywallFeature] = useState<string | null>(null);
+  const [isVipUser, setIsVipUser] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("0ther5ide_user_tier");
+      if (stored === "vip") setIsVipUser(true);
+    } catch {}
+  }, []);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -563,7 +573,13 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
         {/* Indicator Toggles */}
         <div className="flex items-center gap-1 flex-wrap">
           <button
-            onClick={() => setShowAiSetup(!showAiSetup)}
+            onClick={() => {
+              if (!isVipUser) {
+                setPaywallFeature("AI Order Block Trade Targets (Entry, SL, TP)");
+                return;
+              }
+              setShowAiSetup(!showAiSetup);
+            }}
             className={`px-2 py-0.5 rounded transition font-bold border ${
               showAiSetup ? "bg-accent/20 border-accent text-accent" : "border-border/40 text-muted hover:text-fg"
             }`}
@@ -571,13 +587,19 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
             🎯 AI TARGETS
           </button>
           <button
-            onClick={() => setShowExecutionModal(true)}
+            onClick={() => {
+              if (!isVipUser) {
+                setPaywallFeature("1-Click Institutional Trade Execution Router");
+                return;
+              }
+              setShowExecutionModal(true);
+            }}
             className="px-2.5 py-0.5 rounded transition font-extrabold bg-gradient-to-r from-accent to-emerald-400 text-bg shadow-sm hover:brightness-110 active:scale-95"
           >
             ⚡ EXECUTE AI SETUP
           </button>
           <button
-            onClick={() => setShowEma(!showEma)}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Dual EMA 20/50 Trend Ribbons"); return; } setShowEma(!showEma); }}
             className={`px-2 py-0.5 rounded transition font-bold border ${
               showEma ? "bg-cyan-500/20 border-cyan-400 text-cyan-300" : "border-border/40 text-muted hover:text-fg"
             }`}
@@ -585,7 +607,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
             📈 EMA 20/50
           </button>
           <button
-            onClick={() => setShowBollinger(!showBollinger)}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Bollinger Bands Volatility Clouds"); return; } setShowBollinger(!showBollinger); }}
             className={`px-2 py-0.5 rounded transition font-bold border ${
               showBollinger ? "bg-blue-500/20 border-blue-400 text-blue-300" : "border-border/40 text-muted hover:text-fg"
             }`}
@@ -593,7 +615,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
             🌐 BOLLINGER (20,2)
           </button>
           <button
-            onClick={() => setShowVwap(!showVwap)}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Institutional VWAP Benchmark"); return; } setShowVwap(!showVwap); }}
             className={`px-2 py-0.5 rounded transition font-bold border ${
               showVwap ? "bg-yellow-500/20 border-yellow-400 text-yellow-300" : "border-border/40 text-muted hover:text-fg"
             }`}
@@ -601,7 +623,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
             ⚡ VWAP
           </button>
           <button
-            onClick={() => setShowRsi(!showRsi)}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("RSI (14) Momentum Oscillator"); return; } setShowRsi(!showRsi); }}
             className={`px-2 py-0.5 rounded transition font-bold border ${
               showRsi ? "bg-purple-500/20 border-purple-400 text-purple-300" : "border-border/40 text-muted hover:text-fg"
             }`}
@@ -641,6 +663,17 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
           tp1Price={tp1Price}
           tp2Price={tp2Price}
           onClose={() => setShowExecutionModal(false)}
+        />
+      )}
+
+      {/* Paywall Modal for Locked Features */}
+      {paywallFeature && (
+        <PaywallModal
+          featureName={paywallFeature}
+          onClose={() => setPaywallFeature(null)}
+          onUpgrade={() => {
+            window.location.href = "/?tab=pricing";
+          }}
         />
       )}
 

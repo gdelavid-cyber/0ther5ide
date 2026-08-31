@@ -13,8 +13,8 @@ import AgentChat from "@/components/chat/AgentChat";
 import ChartAnalysis from "./ChartAnalysis";
 import OrderFlowPanel from "./OrderFlowPanel";
 import SwarmConsole from "@/components/swarm/SwarmConsole";
-import PolymarketTracker from "@/components/dashboard/PolymarketTracker";
 import PricingView from "@/components/pricing/PricingView";
+import LockedFeatureView from "@/components/pricing/LockedFeatureView";
 import NewsTicker from "./NewsTicker";
 import type { Signal, TensionIndex as TensionType } from "@/lib/types";
 
@@ -35,7 +35,19 @@ export default function Dashboard() {
   const [tension, setTension] = useState<TensionType | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("all");
-  const [planTier, setPlanTier] = useState<"recon" | "vip">("recon");
+  const [planTier, setPlanTierState] = useState<"recon" | "vip">("recon");
+
+  const setPlanTier = (tier: "recon" | "vip") => {
+    setPlanTierState(tier);
+    try { localStorage.setItem("0ther5ide_user_tier", tier); } catch {}
+  };
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("0ther5ide_user_tier");
+      if (stored === "vip") setPlanTierState("vip");
+    } catch {}
+  }, []);
   const [user, setUser] = useState<{ name: string; email: string; avatar: string } | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -118,11 +130,6 @@ export default function Dashboard() {
               <SwarmConsole />
             </div>
 
-            {/* Live Polymarket Crisis & Geopolitical Odds */}
-            <div>
-              <PolymarketTracker />
-            </div>
-
             {/* Middle Row: Elite Order Flow & Institutional Liquidity */}
             <div className="h-[480px]">
               <OrderFlowPanel />
@@ -170,33 +177,49 @@ export default function Dashboard() {
         )}
 
         {activeTab === "swarm" && (
-          <div className="space-y-3">
-            <SwarmConsole />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              <div className="lg:col-span-2 h-[480px]">
-                <GodModeGlobe signals={signals} height={470} />
-              </div>
-              <div className="lg:col-span-1 h-[480px]">
-                <AgentChat />
+          planTier === "vip" ? (
+            <div className="space-y-3">
+              <SwarmConsole />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <div className="lg:col-span-2 h-[480px]">
+                  <GodModeGlobe signals={signals} height={470} />
+                </div>
+                <div className="lg:col-span-1 h-[480px]">
+                  <AgentChat />
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <LockedFeatureView
+              featureName="4-NODE AUTONOMOUS AI SWARM"
+              description="Continuous background multi-agent correlation across GDELT, NASA VIIRS satellites, and SEC EDGAR requires Elite Insider clearance."
+              onUpgrade={() => setActiveTab("pricing")}
+            />
+          )
         )}
 
         {activeTab === "flow" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="lg:col-span-2 h-[740px]">
-              <OrderFlowPanel />
-            </div>
-            <div className="lg:col-span-1 space-y-3">
-              <div className="h-[360px]">
-                <ChartAnalysis />
+          planTier === "vip" ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2 h-[740px]">
+                <OrderFlowPanel />
               </div>
-              <div className="h-[360px]">
-                <AgentChat />
+              <div className="lg:col-span-1 space-y-3">
+                <div className="h-[360px]">
+                  <ChartAnalysis />
+                </div>
+                <div className="h-[360px]">
+                  <AgentChat />
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <LockedFeatureView
+              featureName="INSTITUTIONAL ORDER FLOW & GEX LADDER"
+              description="Real-time off-exchange dark pool prints, options golden sweeps, and gamma exposure (GEX) volatility walls are reserved for Elite Insiders."
+              onUpgrade={() => setActiveTab("pricing")}
+            />
+          )
         )}
 
         {activeTab === "globe" && (
@@ -216,35 +239,51 @@ export default function Dashboard() {
         )}
 
         {activeTab === "intel" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="lg:col-span-2 h-[720px]">
-              <IntelFeed />
-            </div>
-            <div className="lg:col-span-1 space-y-3">
-              <div className="h-[350px]">
-                <GodModeGlobe signals={signals} height={340} />
+          planTier === "vip" ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2 h-[720px]">
+                <IntelFeed />
               </div>
-              <div className="h-[350px]">
-                <AgentChat />
+              <div className="lg:col-span-1 space-y-3">
+                <div className="h-[350px]">
+                  <GodModeGlobe signals={signals} height={340} />
+                </div>
+                <div className="h-[350px]">
+                  <AgentChat />
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <LockedFeatureView
+              featureName="CLASSIFIED LIVE INTEL & RADAR"
+              description="Real-time multi-sensor defense dispatches and military frequency intercepts require Elite Insider clearance."
+              onUpgrade={() => setActiveTab("pricing")}
+            />
+          )
         )}
 
         {activeTab === "insiders" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="lg:col-span-2 h-[740px]">
-              <InsiderPanel />
-            </div>
-            <div className="lg:col-span-1 space-y-3">
-              <div className="h-[360px]">
-                <ChartAnalysis />
+          planTier === "vip" ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2 h-[740px]">
+                <InsiderPanel />
               </div>
-              <div className="h-[360px]">
-                <AgentChat />
+              <div className="lg:col-span-1 space-y-3">
+                <div className="h-[360px]">
+                  <ChartAnalysis />
+                </div>
+                <div className="h-[360px]">
+                  <AgentChat />
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <LockedFeatureView
+              featureName="UNREDACTED SEC FORM 4 DOSSIERS"
+              description="C-Suite insider surveillance dossiers, historical win-rates, and multi-executive cluster tracking require Elite Insider clearance."
+              onUpgrade={() => setActiveTab("pricing")}
+            />
+          )
         )}
 
         {activeTab === "agent" && (
@@ -263,11 +302,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {activeTab === "poly" && (
-          <div className="min-h-[600px]">
-            <PolymarketTracker />
-          </div>
-        )}
+
 
         {activeTab === "pricing" && (
           <div className="min-h-[700px]">
@@ -285,9 +320,11 @@ export default function Dashboard() {
           { id: "all", label: "OVERVIEW", icon: "⊞" },
           { id: "globe", label: "GLOBE", icon: "◎" },
           { id: "agent", label: "AI CO-PILOT", icon: "🤖" },
-          { id: "flow", label: "FLOW", icon: "⚡" },
-          { id: "poly", label: "POLY", icon: "🔮" },
-        ].map((t) => (
+          { id: "flow", label: "FLOW", icon: "⚡", isLocked: true },
+          { id: "pricing", label: "ELITE PASS", icon: "👑" },
+        ].map((t) => {
+          const isItemLocked = t.isLocked && planTier !== "vip";
+          return (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
@@ -298,9 +335,9 @@ export default function Dashboard() {
             }`}
           >
             <span className="text-xs">{t.icon}</span>
-            <span>{t.label}</span>
+            <span>{t.label}{isItemLocked ? " 🔒" : ""}</span>
           </button>
-        ))}
+        );})}
       </div>
 
       <FloatingAssistant />

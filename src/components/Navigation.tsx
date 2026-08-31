@@ -14,15 +14,14 @@ interface NavigationProps {
 }
 
 const NAV_ITEMS = [
-  { id: "all", label: "OVERVIEW", icon: "⊞" },
-  { id: "swarm", label: "SWARM", icon: "🤖" },
-  { id: "globe", label: "GLOBE", icon: "◎" },
-  { id: "flow", label: "FLOW", icon: "⚡" },
-  { id: "intel", label: "INTEL", icon: "◆" },
-  { id: "insiders", label: "INSIDERS", icon: "⚲" },
-  { id: "poly", label: "POLYMARKET", icon: "🔮" },
-  { id: "agent", label: "⚡ AI AGENT", icon: "🤖" },
-  { id: "pricing", label: "PRICING", icon: "💳" },
+  { id: "all", label: "OVERVIEW", icon: "⊞", isLocked: false },
+  { id: "globe", label: "GLOBE", icon: "◎", isLocked: false },
+  { id: "agent", label: "AI CO-PILOT", icon: "🤖", isLocked: false, isFreeBadge: true },
+  { id: "flow", label: "FLOW", icon: "⚡", isLocked: true },
+  { id: "insiders", label: "INSIDERS", icon: "⚲", isLocked: true },
+  { id: "intel", label: "INTEL", icon: "◆", isLocked: true },
+  { id: "swarm", label: "SWARM", icon: "🛰️", isLocked: true },
+  { id: "pricing", label: "ELITE PASS", icon: "👑", isLocked: false },
 ];
 
 export default function Navigation({
@@ -60,20 +59,27 @@ export default function Navigation({
               <span className="text-[9px] text-muted bg-surface px-1.5 py-0.5 rounded border border-border/50">v2.1.0</span>
             </div>
             <div className="hidden md:flex items-center gap-1 ml-4">
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleTabClick(item.id)}
-                  className={"px-2 py-1 text-[10px] uppercase tracking-wider rounded transition flex items-center gap-1.5 " + (
-                    activeTab === item.id
-                      ? "bg-accent/10 text-accent border-b-2 border-accent font-bold"
-                      : "text-muted hover:text-fg/80"
-                  )}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
+              {NAV_ITEMS.map((item) => {
+                const locked = item.isLocked && planTier !== "vip";
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleTabClick(item.id)}
+                    className={"px-2 py-1 text-[10px] uppercase tracking-wider rounded transition flex items-center gap-1.5 " + (
+                      activeTab === item.id
+                        ? "bg-accent/10 text-accent border-b-2 border-accent font-bold"
+                        : locked
+                        ? "text-muted/70 hover:text-yellow-400"
+                        : "text-muted hover:text-fg/80"
+                    )}
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                    {locked && <span className="text-[9px] text-yellow-400">🔒</span>}
+                    {item.isFreeBadge && <span className="text-[8px] bg-accent/20 text-accent px-1 rounded">FREE</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

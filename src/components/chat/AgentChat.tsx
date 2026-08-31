@@ -16,13 +16,13 @@ const AVAILABLE_MODELS = [
 ];
 
 const GUIDANCE_CHIPS = [
-  { label: "🎯 NVDA AI Setup (Entry/SL/TP)", prompt: "Give me the exact AI trade setup for NVDA including Entry, Stop-Loss, and Take-Profit targets." },
-  { label: "🔮 Polymarket Conflict Odds", prompt: "Analyze current Polymarket geopolitical escalation probabilities and their impact on energy/defense." },
+  { label: "🎯 NVDA AI Trade Targets", prompt: "Give me the tactical setup for NVDA and explain how Elite Insider unlocks exact entry/exit targets." },
   { label: "📈 Pull Live NVDA Chart", prompt: "Chart NVDA live candlestick feed and evaluate institutional order flow." },
   { label: "🪙 Pull Live BTC Chart", prompt: "Chart BTC live price action and key support levels." },
-  { label: "🏆 Pull Live XAU/USD Chart", prompt: "Chart XAUUSD live candlestick action, support/resistance targets, and safe-haven accumulation." },
+  { label: "🏆 Pull Live XAU/USD Chart", prompt: "Chart XAUUSD live candlestick action and safe-haven accumulation." },
   { label: "🐋 Dark Pool GEX Ladder", prompt: "Analyze Gamma Exposure (GEX) and off-exchange dark pool block prints for SPY and NVDA." },
-  { label: "⚲ Unredacted SEC Clusters", prompt: "Explain the latest SEC Form 4 insider cluster purchases and C-Suite accumulation velocity." },
+  { label: "⚲ Unredacted SEC Clusters", prompt: "Explain how to decrypt C-Suite insider cluster purchases with the Elite Insider Plan." },
+  { label: "👑 What does Elite Insider include?", prompt: "Explain the features and alpha unlocked with the Elite Insider Pass ($25/wk)." },
 ];
 
 function extractTicker(text: string): string | null {

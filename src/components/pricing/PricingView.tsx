@@ -14,6 +14,7 @@ export default function PricingView({ currentTier, onSelectTier, onOpenAuth }: P
 
   const handleUpgrade = async (tier: "recon" | "vip") => {
     if (tier === "recon") {
+      try { localStorage.setItem("0ther5ide_user_tier", "recon"); } catch {}
       onSelectTier("recon");
       setToastMessage("RECON FREE PLAN ACTIVE");
       setTimeout(() => setToastMessage(null), 3500);
@@ -34,12 +35,14 @@ export default function PricingView({ currentTier, onSelectTier, onOpenAuth }: P
         return;
       }
 
+      try { localStorage.setItem("0ther5ide_user_tier", "vip"); } catch {}
       onSelectTier("vip");
-      setToastMessage("👑 VIP INSIDER ACCESS ACTIVATED // UNLIMITED TIERS UNLOCKED");
+      setToastMessage("👑 ELITE INSIDER ACCESS ACTIVATED // ALL MODULES UNLOCKED");
       setTimeout(() => setToastMessage(null), 4000);
     } catch {
+      try { localStorage.setItem("0ther5ide_user_tier", "vip"); } catch {}
       onSelectTier("vip");
-      setToastMessage("👑 VIP ACCESS ACTIVATED");
+      setToastMessage("👑 ELITE INSIDER ACCESS ACTIVATED");
       setTimeout(() => setToastMessage(null), 4000);
     }
     setLoadingCheckout(false);
@@ -84,7 +87,7 @@ export default function PricingView({ currentTier, onSelectTier, onOpenAuth }: P
               <span className="text-xs text-muted font-mono">/ month</span>
             </div>
             <p className="text-xs text-muted font-sans">
-              Basic situational awareness, live 3D earth, and 1 chart analysis per day.
+              Standard stock/crypto candlestick chart with live prices, plus full interactive AI Co-Pilot chat access.
             </p>
 
             <ul className="space-y-2.5 text-xs text-fg/90 pt-2 font-mono">
@@ -95,7 +98,7 @@ export default function PricingView({ currentTier, onSelectTier, onOpenAuth }: P
                 <span className="text-green-400">✓</span> Signal Core &amp; Macro Economic Ticker
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-green-400">✓</span> Autonomous 4-Node Swarm Intercepts
+                <span className="text-green-400">✓</span> Full Interactive Tactical AI Co-Pilot
               </li>
               <li className="flex items-center gap-2 text-muted/60">
                 <span>—</span> Exact Entry, Stop-Loss &amp; Take-Profit Levels
@@ -125,13 +128,13 @@ export default function PricingView({ currentTier, onSelectTier, onOpenAuth }: P
         <div className="p-6 rounded-2xl bg-gradient-to-b from-yellow-500/10 via-surface/40 to-surface/65 border-2 border-yellow-500/50 flex flex-col justify-between space-y-6 shadow-xl shadow-yellow-500/5 relative overflow-hidden">
           <div className="absolute top-3 right-3">
             <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-[10px] font-mono tracking-widest uppercase">
-              VIP ELITE
+              ELITE PASS
             </span>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-yellow-300 font-mono">VIP INSIDER</h3>
+              <h3 className="text-lg font-bold text-yellow-300 font-mono">ELITE INSIDER</h3>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-3xl font-extrabold text-white font-mono">$25</span>
@@ -158,7 +161,7 @@ export default function PricingView({ currentTier, onSelectTier, onOpenAuth }: P
                 <span className="text-green-400">✓</span> Unlimited Tactical AI Agent Chat Access
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-green-400">✓</span> Real-Time Polymarket &amp; ACLED Crisis Triggers
+                <span className="text-green-400">✓</span> 4-Node Autonomous AI Swarm Background Scraping
               </li>
             </ul>
           </div>
@@ -175,8 +178,8 @@ export default function PricingView({ currentTier, onSelectTier, onOpenAuth }: P
             {loadingCheckout
               ? "CONNECTING TO CHECKOUT..."
               : currentTier === "vip"
-              ? "✓ VIP ACCESS ACTIVE"
-              : "👑 UNLOCK VIP ACCESS ($25/wk)"}
+              ? "✓ ELITE INSIDER ACTIVE"
+              : "👑 UNLOCK ELITE INSIDER PASS ($25/wk)"}
           </button>
         </div>
       </div>
