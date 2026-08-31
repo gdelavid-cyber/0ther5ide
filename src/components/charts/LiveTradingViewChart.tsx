@@ -138,6 +138,9 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   const [showExecutionModal, setShowExecutionModal] = useState<boolean>(false);
   const [paywallFeature, setPaywallFeature] = useState<string | null>(null);
   const [isVipUser, setIsVipUser] = useState<boolean>(false);
+  // Swarm Intelligence & Alpha Signal State
+  const [swarmSignal, setSwarmSignal] = useState<any>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -232,6 +235,30 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     } catch {}
   }, []);
 
+  // Fetch Swarm Consensus Intelligence from /api/swarm/market-signals
+  const fetchSwarmSignal = useCallback(async (sym: string) => {
+    try {
+      const res = await fetch(`/api/swarm/market-signals?symbol=${sym}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setSwarmSignal(data);
+    } catch {}
+  }, []);
+
+  const handleSyncSwarmIndicators = () => {
+    if (!swarmSignal || !swarmSignal.recommendedIndicators) return;
+    const rec = swarmSignal.recommendedIndicators;
+    setShowAiSetup(rec.showAiSetup ?? true);
+    setShowEma(rec.showEma ?? false);
+    setShowBollinger(rec.showBollinger ?? false);
+    setShowVwap(rec.showVwap ?? true);
+    setShowRsi(rec.showRsi ?? false);
+    setSpecialIndicator(rec.specialIndicator ?? "none");
+
+    setSyncNotice(`⚡ SYNCED: Activated Swarm ${swarmSignal.regime} Indicator Setup!`);
+    setTimeout(() => setSyncNotice(null), 3500);
+  };
+
   useEffect(() => {
     const clean = symbol.toUpperCase().replace(/[^A-Z]/g, "") || "NVDA";
     const actual = clean === "GOLD" || clean === "XAU" ? "XAUUSD" : clean;
@@ -241,9 +268,13 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   useEffect(() => {
     setCandles(generateSeedCandles(activeSymbol));
     fetchLiveCandles(activeSymbol);
-    const interval = setInterval(() => fetchLiveCandles(activeSymbol), 3000);
+    fetchSwarmSignal(activeSymbol);
+    const interval = setInterval(() => {
+      fetchLiveCandles(activeSymbol);
+      fetchSwarmSignal(activeSymbol);
+    }, 4000);
     return () => clearInterval(interval);
-  }, [activeSymbol, fetchLiveCandles]);
+  }, [activeSymbol, fetchLiveCandles, fetchSwarmSignal]);
 
   // Limitless Continuous Zoom & Pan Engine
   const handleZoomIn = () => setZoomLevel((z) => Math.min(25.0, +(z * 1.3).toFixed(3)));
@@ -1018,12 +1049,59 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
           : "w-full rounded-2xl border border-accent/40 overflow-hidden bg-[#06090e] flex flex-col shadow-[0_0_40px_rgba(0,255,136,0.15)] my-2 font-mono"
       }`}
     >
+      {/* Swarm Autonomous Intelligence HUD Bar */}
+      {swarmSignal && (
+        <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-gradient-to-r from-purple-950/40 via-[#070b14] to-emerald-950/40 border-b border-accent/40 text-[9.5px] gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="text-purple-300 font-extrabold tracking-wider">🤖 AI SWARM CONSENSUS:</span>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 font-extrabold text-[9px]">
+              {swarmSignal.direction} ({swarmSignal.confidenceScore}% Confluence)
+            </span>
+            <span className="text-muted hidden sm:inline">·</span>
+            <span className="text-amber-300 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 text-[8.5px] hidden sm:inline">
+              REGIME: {swarmSignal.regime}
+            </span>
+            <span className="text-muted hidden md:inline">·</span>
+            <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30 text-[8.5px] hidden md:inline">
+              💰 COULD HAVE MADE: +${swarmSignal.hypotheticalPnL?.totalProfitUsd.toLocaleString()} (+{swarmSignal.hypotheticalPnL?.profitPercentage}%)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleSyncSwarmIndicators}
+              className="px-2.5 py-0.5 rounded bg-gradient-to-r from-purple-600/30 to-accent/30 border border-accent/80 text-accent font-extrabold text-[9px] hover:brightness-125 transition flex items-center gap-1 shadow-sm"
+              title="Auto-apply the AI Swarm's optimal indicator cocktail for this market regime"
+            >
+              <span>⚡ SYNC SWARM SETUP</span>
+            </button>
+            <button
+              onClick={() => setShowExecutionModal(true)}
+              className="px-2.5 py-0.5 rounded bg-gradient-to-r from-accent to-emerald-400 text-bg font-extrabold text-[9px] hover:brightness-110 transition shadow-md"
+            >
+              ⚡ 1-CLICK BRACKET
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sync Notification Banner */}
+      {syncNotice && (
+        <div className="px-3 py-1 bg-accent/20 border-b border-accent/60 text-accent text-[9px] font-bold text-center animate-fade-in">
+          {syncNotice}
+        </div>
+      )}
+
       {/* Webull Pro Title / Drag Handle Bar */}
       <div
         onPointerDown={isFloating && !isFullscreenWindow ? handleWindowPointerDown : undefined}
         onPointerMove={isFloating && !isFullscreenWindow ? handleWindowPointerMove : undefined}
         onPointerUp={isFloating && !isFullscreenWindow ? handleWindowPointerUp : undefined}
-        className={`flex flex-wrap items-center justify-between px-3.5 py-2.5 bg-[#0a0f18] border-b border-border/60 text-[10px] gap-2 ${
+        className={`flex flex-wrap items-center justify-between px-3.5 py-2 bg-[#0a0f18] border-b border-border/60 text-[10px] gap-2 ${
           isFloating && !isFullscreenWindow ? "cursor-move select-none" : ""
         }`}
       >
