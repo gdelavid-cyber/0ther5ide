@@ -39,11 +39,11 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
   const [dataSource, setDataSource] = useState<string>("Kraken & NASDAQ Real-Time");
   
   // Indicator Toggles
-  const [showAiSetup, setShowAiSetup] = useState(true);
-  const [showEma, setShowEma] = useState(true);
-  const [showBollinger, setShowBollinger] = useState(true);
-  const [showVwap, setShowVwap] = useState(true);
-  const [showRsi, setShowRsi] = useState(true);
+  const [showAiSetup, setShowAiSetup] = useState(false);
+  const [showEma, setShowEma] = useState(false);
+  const [showBollinger, setShowBollinger] = useState(false);
+  const [showVwap, setShowVwap] = useState(false);
+  const [showRsi, setShowRsi] = useState(false);
 
   // Crosshair Hover State
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
@@ -55,7 +55,21 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
   useEffect(() => {
     try {
       const stored = localStorage.getItem("0ther5ide_user_tier");
-      if (stored === "vip") setIsVipUser(true);
+      if (stored === "vip") {
+        setIsVipUser(true);
+        setShowAiSetup(true);
+        setShowEma(true);
+        setShowBollinger(true);
+        setShowVwap(true);
+        setShowRsi(true);
+      } else {
+        setIsVipUser(false);
+        setShowAiSetup(false);
+        setShowEma(false);
+        setShowBollinger(false);
+        setShowVwap(false);
+        setShowRsi(false);
+      }
     } catch {}
   }, []);
 

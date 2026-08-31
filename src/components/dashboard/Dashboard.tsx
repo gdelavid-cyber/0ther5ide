@@ -125,23 +125,55 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Autonomous AI Swarm Command Center */}
+            {/* Autonomous AI Swarm Command Center (Gated) */}
             <div>
-              <SwarmConsole />
+              {planTier === "vip" ? (
+                <SwarmConsole />
+              ) : (
+                <LockedFeatureView
+                  featureName="4-NODE AUTONOMOUS AI SWARM"
+                  description="Continuous background scraping and multi-agent consensus fusion across GDELT, NASA satellites, and SEC EDGAR requires Elite Insider clearance."
+                  onUpgrade={() => setActiveTab("pricing")}
+                />
+              )}
             </div>
 
-            {/* Middle Row: Elite Order Flow & Institutional Liquidity */}
-            <div className="h-[480px]">
-              <OrderFlowPanel />
+            {/* Middle Row: Elite Order Flow & Institutional Liquidity (Gated) */}
+            <div className="min-h-[440px]">
+              {planTier === "vip" ? (
+                <OrderFlowPanel />
+              ) : (
+                <LockedFeatureView
+                  featureName="INSTITUTIONAL ORDER FLOW & GEX LADDER"
+                  description="Live off-exchange dark pool prints, options golden sweeps, and gamma exposure (GEX) volatility walls are reserved for Elite Insiders."
+                  onUpgrade={() => setActiveTab("pricing")}
+                />
+              )}
             </div>
 
-            {/* Bottom Row 1: Primary Panels */}
+            {/* Bottom Row 1: Primary Panels (Gated) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <div className="h-[440px]">
-                <IntelFeed />
+              <div className="min-h-[400px]">
+                {planTier === "vip" ? (
+                  <IntelFeed />
+                ) : (
+                  <LockedFeatureView
+                    featureName="CLASSIFIED LIVE INTEL & RADAR"
+                    description="Real-time multi-sensor defense dispatches and military frequency intercepts require Elite Insider clearance."
+                    onUpgrade={() => setActiveTab("pricing")}
+                  />
+                )}
               </div>
-              <div className="h-[440px]">
-                <InsiderPanel />
+              <div className="min-h-[400px]">
+                {planTier === "vip" ? (
+                  <InsiderPanel />
+                ) : (
+                  <LockedFeatureView
+                    featureName="UNREDACTED SEC FORM 4 DOSSIERS"
+                    description="C-Suite insider surveillance dossiers, historical win-rates, and multi-executive cluster tracking require Elite Insider clearance."
+                    onUpgrade={() => setActiveTab("pricing")}
+                  />
+                )}
               </div>
             </div>
 
