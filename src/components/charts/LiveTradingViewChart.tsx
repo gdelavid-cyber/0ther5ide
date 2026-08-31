@@ -39,20 +39,20 @@ const SEED_PRICES: Record<string, number> = {
   SOL: 184.0,
 };
 
-// Generate instant high-fidelity initial candle series for zero-latency first render
+// Generate instant high-fidelity initial candle series for zero-latency first render & deep macro history
 function generateSeedCandles(sym: string): Candle[] {
   const base = SEED_PRICES[sym] || 150.0;
   const list: Candle[] = [];
-  let curr = base * 0.96;
+  let curr = base * 0.94;
   const now = Date.now();
 
-  for (let i = 45; i >= 0; i--) {
+  for (let i = 120; i >= 0; i--) {
     const t = new Date(now - i * 15 * 60 * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const change = (Math.random() - 0.48) * (base * 0.008);
+    const change = (Math.random() - 0.485) * (base * 0.007);
     const open = curr;
     const close = +(open + change).toFixed(2);
-    const high = +(Math.max(open, close) + Math.random() * (base * 0.004)).toFixed(2);
-    const low = +(Math.min(open, close) - Math.random() * (base * 0.004)).toFixed(2);
+    const high = +(Math.max(open, close) + Math.random() * (base * 0.0035)).toFixed(2);
+    const low = +(Math.min(open, close) - Math.random() * (base * 0.0035)).toFixed(2);
     const volume = Math.round(Math.random() * 45000 + 15000);
     curr = close;
     list.push({ time: t, open, high, low, close, volume });
@@ -223,15 +223,19 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     return () => clearInterval(interval);
   }, [activeSymbol, fetchLiveCandles]);
 
-  // Zoom & Pan Actions
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(3.0, +(z + 0.25).toFixed(2)));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.5, +(z - 0.25).toFixed(2)));
+  // Limitless Continuous Zoom & Pan Engine
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(25.0, +(z * 1.3).toFixed(3)));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.04, +(z / 1.3).toFixed(3)));
   const handleResetZoom = () => { setZoomLevel(1.0); setPanOffset(0); };
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    if (e.deltaY < 0) handleZoomIn();
-    else handleZoomOut();
+    // Proportional, smooth, limitless mouse wheel zooming
+    const zoomMultiplier = e.deltaY < 0 ? 1.16 : 0.86;
+    setZoomLevel((z) => {
+      const next = +(z * zoomMultiplier).toFixed(3);
+      return Math.max(0.04, Math.min(25.0, next));
+    });
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -254,8 +258,8 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         e.touches[0].clientY - e.touches[1].clientY
       );
       if (lastTouchDist !== null) {
-        if (dist > lastTouchDist + 10) { handleZoomIn(); setLastTouchDist(dist); }
-        else if (dist < lastTouchDist - 10) { handleZoomOut(); setLastTouchDist(dist); }
+        if (dist > lastTouchDist + 6) { handleZoomIn(); setLastTouchDist(dist); }
+        else if (dist < lastTouchDist - 6) { handleZoomOut(); setLastTouchDist(dist); }
       } else {
         setLastTouchDist(dist);
       }
@@ -264,10 +268,10 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
   const handleTouchEnd = () => setLastTouchDist(null);
 
-  // Compute Visible Candle Window
+  // Compute Visible Candle Window (From 2 sniper candles up to full 120+ macro history)
   const visibleCandles = useMemo(() => {
     const total = candles.length;
-    const count = Math.max(10, Math.min(total, Math.round(total / zoomLevel)));
+    const count = Math.max(2, Math.min(total, Math.round(total / zoomLevel)));
     const maxP = Math.max(0, total - count);
     const clampedP = Math.max(0, Math.min(maxP, panOffset));
     const start = Math.max(0, total - count - clampedP);
@@ -328,11 +332,14 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     const priceRange = maxPrice - minPrice || 1;
 
     const maxVolume = Math.max(...visibleCandles.map((c) => c.volume)) || 1;
-    const candleWidth = Math.max(4, (w - 85) / visibleCandles.length - 3);
+    const totalSlot = (w - 85) / visibleCandles.length;
+    const candleSpacing = Math.max(0.5, Math.min(6, totalSlot * 0.18));
+    const candleWidth = Math.max(1.2, totalSlot - candleSpacing);
+    const candleStride = candleWidth + candleSpacing;
 
     // 1. Draw Volume Histogram (Bottom of Price Area)
     visibleCandles.forEach((c, idx) => {
-      const x = 15 + idx * (candleWidth + 3);
+      const x = 15 + idx * candleStride;
       const vHeight = (c.volume / maxVolume) * volumeAreaHeight;
       const y = priceAreaHeight - vHeight;
       const isBull = c.close >= c.open;
@@ -365,7 +372,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       visibleCandles.forEach((_, idx) => {
         const u = upper[idx];
         if (u !== null && u !== undefined) {
-          const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+          const x = 15 + idx * candleStride + candleWidth / 2;
           const y = priceAreaHeight - ((u - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
           if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
         }
@@ -373,7 +380,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       for (let idx = visibleCandles.length - 1; idx >= 0; idx--) {
         const l = lower[idx];
         if (l !== null && l !== undefined) {
-          const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+          const x = 15 + idx * candleStride + candleWidth / 2;
           const y = priceAreaHeight - ((l - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
           ctx.lineTo(x, y);
         }
@@ -390,7 +397,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         visibleCandles.forEach((_, idx) => {
           const val = vals[idx];
           if (val !== null && val !== undefined) {
-            const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+            const x = 15 + idx * candleStride + candleWidth / 2;
             const y = priceAreaHeight - ((val - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
             if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
           }
@@ -426,7 +433,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         visibleCandles.forEach((_, idx) => {
           const val = vals[idx];
           if (val !== null && val !== undefined) {
-            const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+            const x = 15 + idx * candleStride + candleWidth / 2;
             const y = priceAreaHeight - ((val - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
             if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
           }
@@ -450,7 +457,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         cumVol += c.volume;
         cumPV += tp * c.volume;
         const v = cumPV / (cumVol || 1);
-        const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+        const x = 15 + idx * candleStride + candleWidth / 2;
         const y = priceAreaHeight - ((v - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
         if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       });
@@ -459,7 +466,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
     // 2. Draw Candlesticks with Glowing Bodies
     visibleCandles.forEach((c, idx) => {
-      const x = 15 + idx * (candleWidth + 3);
+      const x = 15 + idx * candleStride;
       const isBull = c.close >= c.open;
       const color = isBull ? "#00ff88" : "#ff3b5c";
 
@@ -470,7 +477,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
       // Wick
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = Math.max(1, Math.min(2.5, candleWidth * 0.15));
       ctx.beginPath();
       ctx.moveTo(x + candleWidth / 2, highY);
       ctx.lineTo(x + candleWidth / 2, lowY);
@@ -482,7 +489,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
       ctx.fillStyle = color;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 4;
+      ctx.shadowBlur = Math.min(6, Math.max(2, candleWidth * 0.2));
       ctx.fillRect(x, bodyY, candleWidth, bodyH);
       ctx.shadowBlur = 0;
     });
@@ -558,7 +565,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         if (curr.low > prev2.high) {
           const yTop = priceAreaHeight - ((curr.low - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
           const yBottom = priceAreaHeight - ((prev2.high - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
-          const xStart = 15 + (i - 2) * (candleWidth + 3);
+          const xStart = 15 + (i - 2) * candleStride;
           const fvgWidth = w - 65 - xStart;
           ctx.fillStyle = "rgba(0, 255, 136, 0.15)";
           ctx.fillRect(xStart, yTop, fvgWidth, yBottom - yTop);
@@ -594,7 +601,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       ctx.lineWidth = 2;
       ctx.beginPath();
       deltas.forEach((d, i) => {
-        const x = 15 + i * (candleWidth + 3) + candleWidth / 2;
+        const x = 15 + i * candleStride + candleWidth / 2;
         const y = zeroY - (d / maxD) * (cvdRange * 0.45);
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       });
@@ -620,7 +627,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       const wave2Points: { x: number; y: number }[] = [];
 
       visibleCandles.forEach((c, i) => {
-        const x = 15 + i * (candleWidth + 3) + candleWidth / 2;
+        const x = 15 + i * candleStride + candleWidth / 2;
         const sinVal = Math.sin((i / visibleCandles.length) * Math.PI * 3 + (c.close > c.open ? 0.5 : -0.5));
         const w1 = yMid - sinVal * (gmRange * 0.38);
         const w2 = yMid - Math.sin((i / visibleCandles.length) * Math.PI * 2.6) * (gmRange * 0.32);
@@ -695,7 +702,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       visibleCandles.forEach((_, idx) => {
         const val = rsiValues[idx];
         if (val !== null && val !== undefined) {
-          const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+          const x = 15 + idx * candleStride + candleWidth / 2;
           const y = rsiBottom - (val / 100) * rsiRange;
           if (!rsiStarted) { ctx.moveTo(x, y); rsiStarted = true; } else ctx.lineTo(x, y);
         }
@@ -802,8 +809,10 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     const y = e.clientY - rect.top;
     setMousePos({ x, y });
 
-    const candleWidth = Math.max(4, (rect.width - 85) / visibleCandles.length - 3);
-    const idx = Math.floor((x - 15) / (candleWidth + 3));
+    const totalSlot = (rect.width - 85) / visibleCandles.length;
+    const candleSpacing = Math.max(0.5, Math.min(6, totalSlot * 0.18));
+    const candleStride = Math.max(1.2, totalSlot - candleSpacing) + candleSpacing;
+    const idx = Math.floor((x - 15) / (candleStride || 1));
     if (idx >= 0 && idx < visibleCandles.length) {
       setHoveredCandle(visibleCandles[idx]);
     } else {
