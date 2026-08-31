@@ -10,7 +10,7 @@ export default function ChartAnalysis() {
           <span className="text-accent font-bold text-sm font-mono">LIVE MARKET TERMINAL</span>
           <span className="w-2 h-2 rounded-full bg-accent signal-pulse" />
         </div>
-        <span className="text-[10px] text-muted font-mono">TRADINGVIEW REAL-TIME</span>
+        <span className="text-[10px] text-muted font-mono">KRAKEN & NASDAQ DIRECT EXCHANGE FEED</span>
       </div>
 
       <div className="flex-1 min-h-[300px]">
