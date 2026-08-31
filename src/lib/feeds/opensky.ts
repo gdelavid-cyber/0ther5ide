@@ -51,3 +51,19 @@ export async function fetchOpenSky(): Promise<FlightState[]> {
     }
   });
 }
+
+export function flightsToMarkers(flights: any[]) {
+  return flights.filter((f) => f.latitude && f.longitude).slice(0, 100).map((f, i) => ({
+    id: `flight-${f.icao24 || i}`,
+    type: "flight" as const,
+    title: `Flight ${f.callsign || f.icao24} (${f.origin_country})`,
+    country: f.origin_country || "Airspace",
+    lat: f.latitude || 0,
+    lng: f.longitude || 0,
+    severity: 2,
+    source: "OpenSky Network",
+    url: "https://opensky-network.org",
+    ts: new Date().toISOString(),
+    tags: [{ k: "source", t: "OpenSky" }, { k: "icao", t: f.icao24 }],
+  }));
+}

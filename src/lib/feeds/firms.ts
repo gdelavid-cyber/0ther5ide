@@ -57,3 +57,19 @@ function parseFIRMSCSV(csv: string): FIRMSFire[] {
     return obj as FIRMSFire;
   });
 }
+
+export function firesToSignals(fires: any[]) {
+  return fires.slice(0, 50).map((f, i) => ({
+    id: `firms-${i}`,
+    type: "satellite" as const,
+    title: `Thermal Anomaly: ${f.brightness || 340}K (${f.satellite || "VIIRS"})`,
+    country: "Satellite Observation",
+    lat: f.latitude || 0,
+    lng: f.longitude || 0,
+    severity: f.brightness > 350 ? 0 : f.brightness > 330 ? 1 : 2,
+    source: "NASA FIRMS",
+    url: "https://firms.modaps.eosdis.nasa.gov",
+    ts: new Date().toISOString(),
+    tags: [{ k: "source", t: "NASA FIRMS" }],
+  }));
+}

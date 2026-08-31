@@ -35,3 +35,19 @@ export async function fetchGDELT(): Promise<GDELTArticle[]> {
     }
   });
 }
+
+export function gdeltToSignals(articles: any[]) {
+  return articles.slice(0, 50).map((a, i) => ({
+    id: `gdelt-${i}-${(a.domain || "news").replace(/[^a-zA-Z0-9]/g, "")}`,
+    type: "news" as const,
+    title: a.title || "Geopolitical intelligence dispatch",
+    country: a.sourcecountry || "International",
+    lat: 0,
+    lng: 0,
+    severity: 1,
+    source: "GDELT 2.0",
+    url: a.url || "https://gdeltproject.org",
+    ts: new Date().toISOString(),
+    tags: [{ k: "source", t: "GDELT" }, { k: "domain", t: a.domain || "web" }],
+  }));
+}
