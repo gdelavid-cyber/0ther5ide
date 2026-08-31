@@ -8,36 +8,36 @@ export default function FloatingAssistant() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 font-mono">
+    <div className="fixed bottom-5 right-5 z-[9999] font-mono">
       {/* Expanded Floating Assistant Modal */}
       {isOpen ? (
         <div
-          className={`bg-bg/95 backdrop-blur-2xl border border-accent/50 rounded-2xl shadow-2xl flex flex-col transition-all overflow-hidden animate-fade-in ${
+          className={`bg-bg/95 backdrop-blur-2xl border-2 border-accent/60 rounded-2xl shadow-[0_0_50px_rgba(0,255,136,0.25)] flex flex-col transition-all overflow-hidden animate-fade-in ${
             isExpanded
-              ? "w-[94vw] md:w-[680px] h-[82vh] md:h-[650px]"
-              : "w-[92vw] sm:w-[420px] md:w-[460px] h-[520px]"
+              ? "w-[94vw] md:w-[720px] h-[86vh] md:h-[700px]"
+              : "w-[92vw] sm:w-[440px] md:w-[480px] h-[560px]"
           }`}
         >
           {/* Floating Window Titlebar */}
-          <div className="bg-surface/90 border-b border-border/50 px-3.5 py-2 flex items-center justify-between">
+          <div className="bg-surface/90 border-b border-border/50 px-4 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-accent signal-pulse" />
-              <span className="text-xs font-bold text-accent tracking-wider">0ther5ide AI CO-PILOT</span>
-              <span className="text-[9px] text-muted hidden sm:inline">· OPENROUTER LIVE</span>
+              <span className="text-xs font-bold text-accent tracking-wider font-mono">0ther5ide AI CO-PILOT</span>
+              <span className="text-[10px] text-muted hidden sm:inline">· OPENROUTER LIVE</span>
             </div>
 
             {/* Window Controls */}
-            <div className="flex items-center gap-1.5 text-xs text-muted">
+            <div className="flex items-center gap-2 text-xs text-muted">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface hover:text-fg transition"
+                className="px-2 py-0.5 rounded bg-surface border border-border/50 hover:border-accent hover:text-fg transition font-bold"
                 title={isExpanded ? "Restore standard size" : "Expand window"}
               >
-                {isExpanded ? "⤢" : "⤡"}
+                {isExpanded ? "⤢ STANDARD" : "⤡ EXPAND"}
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition font-bold"
+                className="w-7 h-7 rounded flex items-center justify-center bg-red-500/10 border border-red-500/30 hover:bg-red-500/30 hover:text-red-300 transition font-bold text-sm"
                 title="Close assistant"
               >
                 ✕
@@ -54,14 +54,16 @@ export default function FloatingAssistant() {
         /* Collapsed Floating Action Button (FAB) */
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-surface/90 hover:bg-surface text-accent border border-accent/50 shadow-2xl backdrop-blur-xl transition-all hover:scale-105 active:scale-95 group"
+          className="flex items-center gap-3 px-4 py-3 rounded-full bg-bg/95 hover:bg-surface text-accent border-2 border-accent shadow-[0_0_30px_rgba(0,255,136,0.3)] backdrop-blur-2xl transition-all hover:scale-105 active:scale-95 group"
         >
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent" />
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-90" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-accent" />
           </span>
-          <span className="text-xs font-bold tracking-wider font-mono">05 CO-PILOT (AI)</span>
-          <span className="text-[10px] text-muted group-hover:text-fg transition">💬</span>
+          <span className="text-xs font-bold tracking-wider font-mono text-accent">⚡ AI CO-PILOT (OPEN)</span>
+          <span className="text-xs bg-accent/20 px-2 py-0.5 rounded border border-accent/40 text-accent group-hover:bg-accent group-hover:text-bg transition">
+            LIVE 💬
+          </span>
         </button>
       )}
     </div>
