@@ -1,23 +1,12 @@
-const path = require("path");
-
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  transpilePackages: ["globe.gl", "three", "three-globe", "three-render-objects"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" },
     ],
-  },
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "three/webgpu": path.resolve(__dirname, "node_modules/three/build/three.webgpu.js"),
-      "three/examples/jsm": path.resolve(__dirname, "node_modules/three/examples/jsm"),
-      "three/addons": path.resolve(__dirname, "node_modules/three/examples/jsm"),
-      three$: path.resolve(__dirname, "src/lib/three-compat.js"),
-    };
-    return config;
   },
   async headers() {
     return [
