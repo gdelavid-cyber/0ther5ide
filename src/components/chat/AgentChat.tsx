@@ -39,7 +39,8 @@ export default function AgentChat() {
   const [busy, setBusy] = useState(false);
   const [selectedModel, setSelectedModel] = useState("nvidia/nemotron-3.5-lightning:free");
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
-  const [activeChartSymbol, setActiveChartSymbol] = useState<string | null>(null);
+  const [hiddenCharts, setHiddenCharts] = useState<Record<number, boolean>>({});
+  const toggleChart = (idx: number) => setHiddenCharts((prev) => ({ ...prev, [idx]: !prev[idx] }));
   const logRef = useRef<HTMLDivElement>(null);
 
   const sendMessage = async (overrideText?: string) => {
@@ -178,8 +179,8 @@ export default function AgentChat() {
             >
               {m.content}
 
-              {/* Inline Live TradingView Candlestick Chart — Instant Real-Time Feed */}
-              {m.chartSymbol && (
+              {/* Inline Live Candlestick Chart with working toggle */}
+              {m.chartSymbol && !hiddenCharts[i] && (
                 <div className="mt-3 mb-1 w-full animate-fade-in">
                   <LiveTradingViewChart symbol={m.chartSymbol} height={280} />
                 </div>
@@ -192,10 +193,10 @@ export default function AgentChat() {
                   <div className="flex items-center gap-2">
                     {m.chartSymbol && (
                       <button
-                        onClick={() => setActiveChartSymbol(activeChartSymbol === m.chartSymbol ? null : m.chartSymbol!)}
-                        className="px-2 py-0.5 rounded border border-border/50 hover:border-accent/50 text-accent text-[9px]"
+                        onClick={() => toggleChart(i)}
+                        className="px-2 py-0.5 rounded border border-border/50 hover:border-accent/50 text-accent text-[9px] font-mono hover:bg-accent/10 transition"
                       >
-                        📊 {activeChartSymbol === m.chartSymbol ? "HIDE CHART" : `CHART ${m.chartSymbol}`}
+                        📊 {hiddenCharts[i] ? `SHOW CHART (${m.chartSymbol})` : "HIDE CHART"}
                       </button>
                     )}
                     <button
