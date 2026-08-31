@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { id: "flow", label: "FLOW", icon: "⚡" },
   { id: "intel", label: "INTEL", icon: "◆" },
   { id: "insiders", label: "INSIDERS", icon: "⚲" },
+  { id: "poly", label: "POLYMARKET", icon: "🔮" },
   { id: "agent", label: "⚡ AI AGENT", icon: "🤖" },
   { id: "pricing", label: "PRICING", icon: "💳" },
 ];

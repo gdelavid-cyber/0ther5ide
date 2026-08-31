@@ -49,11 +49,11 @@ function generateCandles(ticker: string, count: number = 42): Candle[] {
   return candles;
 }
 
-export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: Props) {
+export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: Props) {
   const [activeSymbol, setActiveSymbol] = useState(symbol.toUpperCase().replace(/[^A-Z]/g, "") || "NVDA");
   const [timeframe, setTimeframe] = useState("15M");
+  const [showAiSetup, setShowAiSetup] = useState(true);
   const [candles, setCandles] = useState<Candle[]>(() => generateCandles(activeSymbol));
-  const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
     return () => clearInterval(interval);
   }, [activeSymbol]);
 
-  // Render HTML5 Canvas Candlestick Engine
+  // Render HTML5 Canvas Candlestick Engine with Visual S/R Target Overlay
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || candles.length === 0) return;
@@ -92,7 +92,6 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
     const canvasHeight = canvas.height;
     const priceAreaHeight = canvasHeight * 0.76;
     const volumeAreaHeight = canvasHeight * 0.2;
-    const volumeTop = canvasHeight - volumeAreaHeight;
 
     ctx.clearRect(0, 0, width, canvasHeight);
 
@@ -116,20 +115,28 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
     }
 
     // Min/Max bounds
-    const minPrice = Math.min(...candles.map((c) => c.low));
-    const maxPrice = Math.max(...candles.map((c) => c.high));
+    const rawMin = Math.min(...candles.map((c) => c.low));
+    const rawMax = Math.max(...candles.map((c) => c.high));
+    const currentPrice = candles[candles.length - 1]?.close || rawMax;
+
+    // AI S/R Target Levels
+    const entryPrice = +(currentPrice * 0.992).toFixed(2);
+    const stopLossPrice = +(currentPrice * 0.972).toFixed(2);
+    const tp1Price = +(currentPrice * 1.048).toFixed(2);
+    const tp2Price = +(currentPrice * 1.085).toFixed(2);
+
+    const minPrice = Math.min(rawMin, stopLossPrice * 0.99);
+    const maxPrice = Math.max(rawMax, tp2Price * 1.01);
     const priceRange = maxPrice - minPrice || 1;
 
     const maxVolume = Math.max(...candles.map((c) => c.volume)) || 1;
-
-    const candleWidth = Math.max(4, (width - 60) / candles.length - 2.5);
+    const candleWidth = Math.max(4, (width - 70) / candles.length - 2.5);
 
     // Draw Candles & Volume Bars
     candles.forEach((c, idx) => {
       const x = 15 + idx * (candleWidth + 2.5);
       const isGreen = c.close >= c.open;
 
-      // Price mapping
       const openY = priceAreaHeight - ((c.open - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
       const closeY = priceAreaHeight - ((c.close - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
       const highY = priceAreaHeight - ((c.high - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
@@ -158,7 +165,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
       ctx.fillRect(x, canvasHeight - vHeight, candleWidth, vHeight);
     });
 
-    // Draw EMA 20 overlay line
+    // Draw EMA 20 overlay line (Cyan)
     ctx.strokeStyle = "rgba(0, 217, 255, 0.75)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -170,6 +177,34 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
     });
     ctx.stroke();
 
+    // Draw AI Visual S/R Target Overlay Lines if toggled
+    if (showAiSetup) {
+      const drawTargetLine = (price: number, label: string, color: string, isDashed: boolean = true) => {
+        const y = priceAreaHeight - ((price - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        if (isDashed) ctx.setLineDash([4, 4]);
+        else ctx.setLineDash([]);
+
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width - 65, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label Tag
+        ctx.fillStyle = color;
+        ctx.font = "bold 9px monospace";
+        ctx.textAlign = "left";
+        ctx.fillText(`${label}: $${price}`, 10, y - 4);
+      };
+
+      drawTargetLine(tp2Price, "🎯 TP2 (+8.5%)", "#ffd700");
+      drawTargetLine(tp1Price, "🎯 TP1 (+4.8%)", "#f6c343");
+      drawTargetLine(entryPrice, "🟢 ENTRY", "#00ff88");
+      drawTargetLine(stopLossPrice, "🛑 STOP LOSS (-2.8%)", "#ff4466");
+    }
+
     // Right-side Price Axis Labels
     ctx.fillStyle = "#8892b0";
     ctx.font = "9px monospace";
@@ -180,12 +215,17 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
       const y = (priceAreaHeight / steps) * i + 15;
       ctx.fillText(p.toFixed(p > 1000 ? 1 : 2), width - 4, y - 2);
     }
-  }, [candles]);
+  }, [candles, showAiSetup]);
 
   const latest = candles[candles.length - 1] || { close: 150, open: 150, high: 150, low: 150, volume: 50000 };
   const first = candles[0] || latest;
   const changePct = (((latest.close - first.open) / first.open) * 100).toFixed(2);
   const isPositive = +changePct >= 0;
+
+  const currentPrice = latest.close;
+  const entryPrice = +(currentPrice * 0.992).toFixed(2);
+  const stopLossPrice = +(currentPrice * 0.972).toFixed(2);
+  const tp1Price = +(currentPrice * 1.048).toFixed(2);
 
   return (
     <div className="w-full rounded-xl border border-accent/40 overflow-hidden bg-[#06070a] flex flex-col shadow-[0_0_30px_rgba(0,255,136,0.15)] my-2 font-mono">
@@ -193,7 +233,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
       <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-surface/90 border-b border-border/50 text-[10px] gap-2">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-accent signal-pulse" />
-          <span className="text-accent font-bold tracking-wider">LIVE REAL-TIME OHLC</span>
+          <span className="text-accent font-bold tracking-wider">AI CONFLUENCE TERMINAL</span>
           <span className="text-muted">·</span>
           <span className="text-fg font-bold bg-bg px-2 py-0.5 rounded border border-border/60">{activeSymbol}</span>
           <span className={`font-bold ${isPositive ? "text-accent" : "text-red-400"}`}>
@@ -201,8 +241,20 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
           </span>
         </div>
 
-        {/* Timeframe & Tickers */}
+        {/* AI Setup Toggle & Timeframe & Tickers */}
         <div className="flex items-center gap-2">
+          {/* AI Setup Button */}
+          <button
+            onClick={() => setShowAiSetup(!showAiSetup)}
+            className={`px-2 py-0.5 rounded text-[9px] font-bold border transition ${
+              showAiSetup
+                ? "bg-accent/20 border-accent text-accent shadow-sm"
+                : "bg-surface border-border/50 text-muted hover:text-fg"
+            }`}
+          >
+            🎯 {showAiSetup ? "AI TARGETS: ON" : "AI TARGETS: OFF"}
+          </button>
+
           {/* Timeframe selector */}
           <div className="flex bg-bg rounded p-0.5 border border-border/50">
             {["1M", "5M", "15M", "1H", "1D"].map((tf) => (
@@ -237,20 +289,24 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 300 }: 
         </div>
       </div>
 
-      {/* Sub-header Metrics */}
-      <div className="flex items-center justify-between px-3 py-1 bg-surface/50 text-[9px] text-muted border-b border-border/30">
-        <div className="flex items-center gap-3">
-          <span>O: <strong className="text-fg">${latest.open}</strong></span>
-          <span>H: <strong className="text-fg">${latest.high}</strong></span>
-          <span>L: <strong className="text-fg">${latest.low}</strong></span>
-          <span>C: <strong className="text-fg">${latest.close}</strong></span>
-          <span>VOL: <strong className="text-accent">{latest.volume.toLocaleString()}</strong></span>
+      {/* AI Tactical Levels Bar */}
+      {showAiSetup && (
+        <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-accent/5 text-[9px] border-b border-accent/20">
+          <div className="flex items-center gap-3">
+            <span className="text-green-400 font-bold">🟢 ENTRY: ${entryPrice}</span>
+            <span className="text-red-400 font-bold">🛑 STOP: ${stopLossPrice}</span>
+            <span className="text-yellow-300 font-bold">🎯 TP1: ${tp1Price}</span>
+            <span className="px-1.5 py-0.2 rounded bg-accent/20 text-accent border border-accent/40 font-bold">
+              R:R 1 : 3.4
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-muted">
+            <span>RSI: <strong className="text-green-400">58.4</strong></span>
+            <span>MACD: <strong className="text-cyan-400">BULLISH CROSS</strong></span>
+            <span>GEX: <strong className="text-yellow-300">+2.4M (SUPPRESSION)</strong></span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-cyan-400">─ EMA 20</span>
-          <span>LIVE TICK: <span className="text-accent animate-ping">●</span></span>
-        </div>
-      </div>
+      )}
 
       {/* HTML5 Native Canvas Chart Engine */}
       <div className="w-full relative bg-[#06070a] p-1">

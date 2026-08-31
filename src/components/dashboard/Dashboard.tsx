@@ -13,6 +13,7 @@ import AgentChat from "@/components/chat/AgentChat";
 import ChartAnalysis from "./ChartAnalysis";
 import OrderFlowPanel from "./OrderFlowPanel";
 import SwarmConsole from "@/components/swarm/SwarmConsole";
+import PolymarketTracker from "@/components/dashboard/PolymarketTracker";
 import PricingView from "@/components/pricing/PricingView";
 import NewsTicker from "./NewsTicker";
 import type { Signal, TensionIndex as TensionType } from "@/lib/types";
@@ -115,6 +116,11 @@ export default function Dashboard() {
             {/* Autonomous AI Swarm Command Center */}
             <div>
               <SwarmConsole />
+            </div>
+
+            {/* Live Polymarket Crisis & Geopolitical Odds */}
+            <div>
+              <PolymarketTracker />
             </div>
 
             {/* Middle Row: Elite Order Flow & Institutional Liquidity */}
@@ -254,6 +260,12 @@ export default function Dashboard() {
                 <GodModeGlobe signals={signals} height={290} />
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === "poly" && (
+          <div className="min-h-[600px]">
+            <PolymarketTracker />
           </div>
         )}
 

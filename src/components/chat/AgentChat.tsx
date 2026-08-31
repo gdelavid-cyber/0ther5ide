@@ -14,12 +14,12 @@ const AVAILABLE_MODELS = [
 ];
 
 const GUIDANCE_CHIPS = [
+  { label: "🎯 NVDA AI Setup (Entry/SL/TP)", prompt: "Give me the exact AI trade setup for NVDA including Entry, Stop-Loss, and Take-Profit targets." },
+  { label: "🔮 Polymarket Conflict Odds", prompt: "Analyze current Polymarket geopolitical escalation probabilities and their impact on energy/defense." },
   { label: "📈 Pull Live NVDA Chart", prompt: "Chart NVDA live candlestick feed and evaluate institutional order flow." },
   { label: "🪙 Pull Live BTC Chart", prompt: "Chart BTC live price action and key support levels." },
-  { label: "🧭 Guide Me Through Terminal", prompt: "Give me a guided walkthrough of this terminal and how to interpret each module." },
-  { label: "🐋 Explain Biggest Insider Trade", prompt: "Explain the biggest SEC Form 4 insider trade in the terminal and what it indicates." },
-  { label: "🛰️ Analyze Satellite Anomalies", prompt: "Analyze the latest NASA VIIRS thermal anomaly hotspots on the 3D globe." },
-  { label: "🌐 Red Sea Maritime Risk", prompt: "Assess current maritime risk and escalation in the Bab-el-Mandeb / Red Sea corridor." },
+  { label: "🐋 Dark Pool GEX Ladder", prompt: "Analyze Gamma Exposure (GEX) and off-exchange dark pool block prints for SPY and NVDA." },
+  { label: "⚲ Unredacted SEC Clusters", prompt: "Explain the latest SEC Form 4 insider cluster purchases and C-Suite accumulation velocity." },
 ];
 
 function extractTicker(text: string): string | null {
