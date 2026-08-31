@@ -49,7 +49,7 @@ Welcome Operator. Here is your tactical breakdown of every live module:
   }
 
   // 3. Financial & Asset Evaluation
-  const isMarket = upper.match(/NVDA|AAPL|TSLA|BTC|ETH|SOL|AMZN|MSFT|GOOGL|GOLD|XAU|SILVER|MARKET|STOCK|CRYPTO|DARK POOL|INSIDER/i);
+  const isMarket = upper.match(/NVDA|AAPL|TSLA|BTC|ETH|SOL|AMZN|MSFT|GOOGL|GOLD|XAUUSD|XAU|SILVER|MARKET|STOCK|CRYPTO|DARK POOL|INSIDER/i);
   if (isMarket) {
     const assetMatch = upper.match(/NVDA|AAPL|TSLA|BTC|ETH|SOL|AMZN|MSFT|GOOGL/i);
     const asset = assetMatch ? assetMatch[0].toUpperCase() : "TARGET ASSET";

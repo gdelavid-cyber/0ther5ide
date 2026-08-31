@@ -26,6 +26,7 @@ const BASE_PRICES: Record<string, number> = {
   AAPL: 224.5,
   GOLD: 2518.5,
   XAU: 2518.5,
+  XAUUSD: 2518.5,
 };
 
 function generateCandles(ticker: string, count: number = 42): Candle[] {
@@ -237,7 +238,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
           <span className="w-2 h-2 rounded-full bg-accent signal-pulse" />
           <span className="text-accent font-bold tracking-wider">AI CONFLUENCE TERMINAL</span>
           <span className="text-muted">·</span>
-          <span className="text-fg font-bold bg-bg px-2 py-0.5 rounded border border-border/60">{activeSymbol}</span>
+          <span className="text-fg font-bold bg-bg px-2 py-0.5 rounded border border-border/60">{activeSymbol === "XAUUSD" || activeSymbol === "GOLD" ? "XAU/USD (Gold)" : activeSymbol}</span>
           <span className={`font-bold ${isPositive ? "text-accent" : "text-red-400"}`}>
             ${latest.close.toLocaleString()} ({isPositive ? "+" : ""}{changePct}%)
           </span>
@@ -274,17 +275,25 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
 
           {/* Quick Tickers */}
           <div className="flex items-center gap-1">
-            {["NVDA", "BTC", "GOLD", "TSLA", "SPY", "ETH", "SOL"].map((t) => (
+            {[
+              { id: "NVDA", label: "NVDA" },
+              { id: "BTC", label: "BTC" },
+              { id: "XAUUSD", label: "XAU/USD" },
+              { id: "TSLA", label: "TSLA" },
+              { id: "SPY", label: "SPY" },
+              { id: "ETH", label: "ETH" },
+              { id: "SOL", label: "SOL" },
+            ].map((t) => (
               <button
-                key={t}
-                onClick={() => setActiveSymbol(t)}
+                key={t.id}
+                onClick={() => setActiveSymbol(t.id)}
                 className={`px-2 py-0.5 rounded transition font-bold ${
-                  activeSymbol === t
+                  activeSymbol === t.id || (t.id === "XAUUSD" && (activeSymbol === "GOLD" || activeSymbol === "XAU"))
                     ? "bg-accent text-bg shadow-md"
                     : "bg-surface border border-border/40 text-muted hover:text-accent"
                 }`}
               >
-                {t}
+                {t.label}
               </button>
             ))}
           </div>
