@@ -18,12 +18,13 @@ const GUIDANCE_CHIPS = [
   { label: "🔮 Polymarket Conflict Odds", prompt: "Analyze current Polymarket geopolitical escalation probabilities and their impact on energy/defense." },
   { label: "📈 Pull Live NVDA Chart", prompt: "Chart NVDA live candlestick feed and evaluate institutional order flow." },
   { label: "🪙 Pull Live BTC Chart", prompt: "Chart BTC live price action and key support levels." },
+  { label: "🏆 Pull Live Gold (XAU) Chart", prompt: "Chart GOLD (XAU) live price action, safe-haven flows, and key resistance targets." },
   { label: "🐋 Dark Pool GEX Ladder", prompt: "Analyze Gamma Exposure (GEX) and off-exchange dark pool block prints for SPY and NVDA." },
   { label: "⚲ Unredacted SEC Clusters", prompt: "Explain the latest SEC Form 4 insider cluster purchases and C-Suite accumulation velocity." },
 ];
 
 function extractTicker(text: string): string | null {
-  const match = text.match(/\b(NVDA|TSLA|BTC|ETH|SOL|AAPL|MSFT|AMZN|GOOGL|SPY|QQQ|GOLD|OIL)\b/i);
+  const match = text.match(/\b(NVDA|TSLA|BTC|ETH|SOL|AAPL|MSFT|AMZN|GOOGL|SPY|QQQ|GOLD|XAU|OIL)\b/i);
   return match ? match[0].toUpperCase() : null;
 }
 

@@ -24,6 +24,8 @@ const BASE_PRICES: Record<string, number> = {
   ETH: 3480.0,
   SOL: 154.2,
   AAPL: 224.5,
+  GOLD: 2518.5,
+  XAU: 2518.5,
 };
 
 function generateCandles(ticker: string, count: number = 42): Candle[] {
@@ -272,7 +274,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
 
           {/* Quick Tickers */}
           <div className="flex items-center gap-1">
-            {["NVDA", "BTC", "TSLA", "SPY", "ETH", "SOL"].map((t) => (
+            {["NVDA", "BTC", "GOLD", "TSLA", "SPY", "ETH", "SOL"].map((t) => (
               <button
                 key={t}
                 onClick={() => setActiveSymbol(t)}
