@@ -1,6 +1,6 @@
 export interface Signal {
   id: string;
-  type: 'conflict' | 'economic' | 'geopolitical' | 'maritime' | 'aerial' | 'cyber' | 'market';
+  type: 'conflict' | 'economic' | 'geopolitical' | 'maritime' | 'aerial' | 'cyber' | 'market' | 'news' | 'satellite' | 'flight';
   title: string;
   country: string;
   lat: number;

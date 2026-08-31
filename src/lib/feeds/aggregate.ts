@@ -7,7 +7,7 @@ import { fetchSECInsiders } from "./sec";
 import { severityColor } from "@/lib/utils";
 import type { Signal, TensionIndex, FlightTrack } from "@/lib/types";
 
-export function acledToSignals(rows: any[]) {
+export function acledToSignals(rows: any[]): Signal[] {
   return (rows || []).slice(0, 200).map((r: any, i: number) => ({
     id: `acled-${i}-${r.iso3 || "LOC"}`,
     type: "conflict" as const,
@@ -23,7 +23,7 @@ export function acledToSignals(rows: any[]) {
   }));
 }
 
-export function gdeltToSignals(articles: any[]) {
+export function gdeltToSignals(articles: any[]): Signal[] {
   return (articles || []).slice(0, 50).map((a: any, i: number) => ({
     id: `gdelt-${i}-${(a.domain || "news").replace(/[^a-zA-Z0-9]/g, "")}`,
     type: "news" as const,
@@ -39,7 +39,7 @@ export function gdeltToSignals(articles: any[]) {
   }));
 }
 
-export function firesToSignals(fires: any[]) {
+export function firesToSignals(fires: any[]): Signal[] {
   return (fires || []).slice(0, 50).map((f: any, i: number) => ({
     id: `firms-${i}`,
     type: "satellite" as const,
@@ -55,7 +55,7 @@ export function firesToSignals(fires: any[]) {
   }));
 }
 
-export function cryptoToSignals(cryptos: any[]) {
+export function cryptoToSignals(cryptos: any[]): Signal[] {
   return (cryptos || []).filter((c: any) => Math.abs(c.price_change_percentage_24h || 0) > 4).map((c: any) => ({
     id: `crypto-${c.id}`,
     type: "market" as const,
