@@ -1,3 +1,5 @@
+const path = require("path");
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -7,6 +9,14 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "**" },
     ],
+  },
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "three/webgpu": path.resolve(__dirname, "src/lib/empty-shim.js"),
+      "three/tsl": path.resolve(__dirname, "src/lib/empty-shim.js"),
+    };
+    return config;
   },
   async headers() {
     return [
