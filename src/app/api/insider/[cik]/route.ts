@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { fetchInsiderDossier } from '@/lib/feeds/sec';
 import type { InsiderDossier } from '@/lib/types';
 

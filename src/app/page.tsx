@@ -1,4 +1,5 @@
-import Dashboard from '@/components/dashboard/Dashboard';
+export const dynamic = "force-dynamic";
+import Dashboard from "@/components/dashboard/Dashboard";
 
 export default function Home() {
   return <Dashboard />;

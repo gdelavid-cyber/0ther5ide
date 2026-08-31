@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { aggregateIntel } from '@/lib/feeds/aggregate';
 
 export async function GET() {

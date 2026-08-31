@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { aggregateIntel } from '@/lib/feeds/aggregate';
 import { fetchSECInsiders } from '@/lib/feeds/sec';
 import { fetchCrypto } from '@/lib/feeds/markets';

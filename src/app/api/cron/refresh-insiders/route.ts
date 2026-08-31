@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { fetchSECInsiders } from '@/lib/feeds/sec';
 
 export async function GET() {
