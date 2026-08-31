@@ -3,7 +3,6 @@
 import { useState } from "react";
 import AuthModal from "@/components/auth/AuthModal";
 import ProfilePanel from "@/components/auth/ProfilePanel";
-import WalletButton from "@/components/wallet/WalletButton";
 
 interface NavigationProps {
   activeTab?: string;
@@ -99,11 +98,6 @@ export default function Navigation({
               <span>{planTier === "vip" ? "👑 VIP INSIDER" : "RECON TIER"}</span>
             </button>
 
-            {/* Web3 Wallet Connect Option */}
-            <div className="hidden sm:block">
-              <WalletButton />
-            </div>
-
             {/* User Auth / Profile */}
             {user ? (
               <div className="relative">
@@ -162,12 +156,6 @@ export default function Navigation({
                 {item.icon} {item.label}
               </button>
             ))}
-            {/* Web3 Wallet Connect Option (Mobile) */}
-            <div className="py-2 border-t border-b border-border/40 my-2">
-              <div className="text-[10px] text-muted mb-1 font-mono">WEB3 WALLET INTEGRATION:</div>
-              <WalletButton />
-            </div>
-
             {!user ? (
               <button
                 onClick={() => { setAuthOpen(true); setMenuOpen(false); }}
