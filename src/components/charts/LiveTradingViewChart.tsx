@@ -303,9 +303,9 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
     // 2. Bollinger Bands Volatility Cloud (Concurrent)
     if (showBollinger) {
-      const upper = [];
-      const lower = [];
-      const mid = [];
+      const upper: (number | null)[] = [];
+      const lower: (number | null)[] = [];
+      const mid: (number | null)[] = [];
       const period = 20; const mult = 2;
 
       visibleCandles.forEach((_, idx) => {
@@ -342,7 +342,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       ctx.fill();
 
       // Draw Bollinger Lines
-      const drawBoll = (vals, color) => {
+      const drawBoll = (vals: (number | null)[], color: string) => {
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -364,9 +364,9 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
     // 3. Dual EMA 20 & 50 Lines (Concurrent)
     if (showEma) {
-      const calcEmaArray = (period) => {
+      const calcEmaArray = (period: number) => {
         const k = 2 / (period + 1);
-        const arr = [];
+        const arr: (number | null)[] = [];
         let prev = visibleCandles[0]?.close || 0;
         visibleCandles.forEach((c, idx) => {
           if (idx === 0) { arr.push(c.close); prev = c.close; }
@@ -378,7 +378,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       const ema20 = calcEmaArray(20);
       const ema50 = calcEmaArray(50);
 
-      const drawEma = (vals, color) => {
+      const drawEma = (vals: (number | null)[], color: string) => {
         ctx.strokeStyle = color;
         ctx.lineWidth = 1.8;
         ctx.beginPath();
@@ -627,7 +627,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       ctx.setLineDash([]);
 
       const period = 14;
-      const rsiValues = [];
+      const rsiValues: (number | null)[] = [];
       let gains = 0; let losses = 0;
       for (let i = 1; i <= period && i < visibleCandles.length; i++) {
         const diff = visibleCandles[i].close - visibleCandles[i - 1].close;
