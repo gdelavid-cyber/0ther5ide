@@ -6,4 +6,4 @@ export * from "./markets";
 export * from "./sec";
 export * from "./orderflow";
 export * from "./providers";
-export * from "./aggregate";
+export { aggregateIntel, flightsToFeed } from "./aggregate";
