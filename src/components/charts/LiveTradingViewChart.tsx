@@ -70,6 +70,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   const [liveChange, setLiveChange] = useState<number>(2.4);
   const [dataSource, setDataSource] = useState<string>("Kraken & NASDAQ Real-Time");
   const [canvasDimensions, setCanvasDimensions] = useState<{ width: number; height: number }>({ width: 720, height: 440 });
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   // Indicator Toggles
   const [showAiSetup, setShowAiSetup] = useState(false);
@@ -120,20 +121,39 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
   // ResizeObserver for dynamic, responsive container adaptation
   useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
+    const updateSize = () => {
+      if (isExpanded) {
+        setCanvasDimensions({
+          width: window.innerWidth - 48,
+          height: window.innerHeight - 150,
+        });
+        return;
+      }
+      if (containerRef.current) {
+        const w = containerRef.current.clientWidth;
+        if (w > 0) {
           setCanvasDimensions({
-            width: Math.floor(entry.contentRect.width),
+            width: Math.floor(w),
             height: height || 440,
           });
         }
       }
-    });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [height]);
+    };
+
+    updateSize();
+    window.addEventListener("resize", updateSize);
+
+    if (containerRef.current && !isExpanded) {
+      const observer = new ResizeObserver(updateSize);
+      observer.observe(containerRef.current);
+      return () => {
+        observer.disconnect();
+        window.removeEventListener("resize", updateSize);
+      };
+    }
+
+    return () => window.removeEventListener("resize", updateSize);
+  }, [height, isExpanded]);
 
   // Fetch Live Real Data from API
   const fetchLiveCandles = useCallback(async (sym: string) => {
@@ -280,6 +300,122 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       ctx.fillStyle = isBull ? "rgba(0, 255, 136, 0.18)" : "rgba(255, 59, 92, 0.18)";
       ctx.fillRect(x, y, candleWidth, vHeight);
     });
+
+    // 2. Bollinger Bands Volatility Cloud (Concurrent)
+    if (showBollinger) {
+      const upper = [];
+      const lower = [];
+      const mid = [];
+      const period = 20; const mult = 2;
+
+      visibleCandles.forEach((_, idx) => {
+        if (idx < period - 1) { upper.push(null); lower.push(null); mid.push(null); return; }
+        const slice = visibleCandles.slice(idx - period + 1, idx + 1);
+        const mean = slice.reduce((a, b) => a + b.close, 0) / period;
+        const variance = slice.reduce((a, b) => a + Math.pow(b.close - mean, 2), 0) / period;
+        const sd = Math.sqrt(variance);
+        mid.push(mean);
+        upper.push(mean + sd * mult);
+        lower.push(mean - sd * mult);
+      });
+
+      ctx.fillStyle = "rgba(0, 217, 255, 0.05)";
+      ctx.beginPath();
+      let started = false;
+      visibleCandles.forEach((_, idx) => {
+        const u = upper[idx];
+        if (u !== null && u !== undefined) {
+          const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+          const y = priceAreaHeight - ((u - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+          if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+        }
+      });
+      for (let idx = visibleCandles.length - 1; idx >= 0; idx--) {
+        const l = lower[idx];
+        if (l !== null && l !== undefined) {
+          const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+          const y = priceAreaHeight - ((l - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw Bollinger Lines
+      const drawBoll = (vals, color) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        let s = false;
+        visibleCandles.forEach((_, idx) => {
+          const val = vals[idx];
+          if (val !== null && val !== undefined) {
+            const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+            const y = priceAreaHeight - ((val - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+            if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+      };
+      drawBoll(upper, "rgba(56, 189, 248, 0.6)");
+      drawBoll(lower, "rgba(56, 189, 248, 0.6)");
+      drawBoll(mid, "rgba(255, 255, 255, 0.2)");
+    }
+
+    // 3. Dual EMA 20 & 50 Lines (Concurrent)
+    if (showEma) {
+      const calcEmaArray = (period) => {
+        const k = 2 / (period + 1);
+        const arr = [];
+        let prev = visibleCandles[0]?.close || 0;
+        visibleCandles.forEach((c, idx) => {
+          if (idx === 0) { arr.push(c.close); prev = c.close; }
+          else { const ema = c.close * k + prev * (1 - k); arr.push(ema); prev = ema; }
+        });
+        return arr;
+      };
+
+      const ema20 = calcEmaArray(20);
+      const ema50 = calcEmaArray(50);
+
+      const drawEma = (vals, color) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        let s = false;
+        visibleCandles.forEach((_, idx) => {
+          const val = vals[idx];
+          if (val !== null && val !== undefined) {
+            const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+            const y = priceAreaHeight - ((val - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+            if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+      };
+
+      drawEma(ema20, "#00e5ff");
+      drawEma(ema50, "#ffd700");
+    }
+
+    // 4. Institutional VWAP Line (Concurrent)
+    if (showVwap) {
+      let cumVol = 0;
+      let cumPV = 0;
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      visibleCandles.forEach((c, idx) => {
+        const tp = (c.high + c.low + c.close) / 3;
+        cumVol += c.volume;
+        cumPV += tp * c.volume;
+        const v = cumPV / (cumVol || 1);
+        const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+        const y = priceAreaHeight - ((v - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+        if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
 
     // 2. Draw Candlesticks with Glowing Bodies
     visibleCandles.forEach((c, idx) => {
@@ -469,6 +605,70 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       ctx.fillText("🔮 GODMODE V3: WAVE 1 (CYAN) · WAVE 2 (MAGENTA)", 10, gmTop + 12);
     }
 
+    // 8. Dedicated Sub-Panel (RSI / CVD / Godmode V3)
+    if (showRsi && specialIndicator !== "cvd" && specialIndicator !== "godmode_v3") {
+      const rsiTop = priceAreaHeight + 10;
+      const rsiBottom = h - 15;
+      const rsiRange = rsiBottom - rsiTop;
+
+      ctx.fillStyle = "rgba(10, 14, 22, 0.85)";
+      ctx.fillRect(0, rsiTop, w - 65, rsiRange);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.strokeRect(0, rsiTop, w - 65, rsiRange);
+
+      const y70 = rsiBottom - 0.7 * rsiRange;
+      const y30 = rsiBottom - 0.3 * rsiRange;
+
+      ctx.strokeStyle = "rgba(255, 59, 92, 0.4)";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(0, y70); ctx.lineTo(w - 65, y70); ctx.stroke();
+      ctx.strokeStyle = "rgba(0, 255, 136, 0.4)";
+      ctx.beginPath(); ctx.moveTo(0, y30); ctx.lineTo(w - 65, y30); ctx.stroke();
+      ctx.setLineDash([]);
+
+      const period = 14;
+      const rsiValues = [];
+      let gains = 0; let losses = 0;
+      for (let i = 1; i <= period && i < visibleCandles.length; i++) {
+        const diff = visibleCandles[i].close - visibleCandles[i - 1].close;
+        if (diff >= 0) gains += diff; else losses -= diff;
+      }
+      let avgGain = gains / period; let avgLoss = losses / period;
+      for (let i = 0; i <= period; i++) rsiValues.push(null);
+      const rs = avgLoss === 0 ? 100 : avgGain / (avgLoss || 1);
+      rsiValues.push(100 - 100 / (1 + rs));
+
+      for (let i = period + 1; i < visibleCandles.length; i++) {
+        const diff = visibleCandles[i].close - visibleCandles[i - 1].close;
+        const gain = diff > 0 ? diff : 0;
+        const loss = diff < 0 ? -diff : 0;
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+        const currentRs = avgLoss === 0 ? 100 : avgGain / (avgLoss || 1);
+        rsiValues.push(100 - 100 / (1 + currentRs));
+      }
+
+      ctx.strokeStyle = "#c084fc";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      let rsiStarted = false;
+      visibleCandles.forEach((_, idx) => {
+        const val = rsiValues[idx];
+        if (val !== null && val !== undefined) {
+          const x = 15 + idx * (candleWidth + 3) + candleWidth / 2;
+          const y = rsiBottom - (val / 100) * rsiRange;
+          if (!rsiStarted) { ctx.moveTo(x, y); rsiStarted = true; } else ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+
+      const latestRsi = rsiValues[rsiValues.length - 1] || 50;
+      ctx.fillStyle = "#c084fc";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("RSI (14): " + latestRsi.toFixed(1), 8, rsiTop + 12);
+    }
+
     // 5. Right Price Axis
     ctx.fillStyle = "#8892b0";
     ctx.font = "8.5px monospace";
@@ -530,7 +730,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       : activeSymbol;
 
   return (
-    <div ref={containerRef} className="w-full rounded-2xl border border-accent/40 overflow-hidden bg-[#04060a] flex flex-col shadow-[0_0_40px_rgba(0,255,136,0.15)] my-2 font-mono">
+    <div ref={containerRef} className={isExpanded ? "fixed inset-0 z-50 bg-[#04060a]/98 backdrop-blur-2xl p-4 flex flex-col w-screen h-screen overflow-hidden font-mono animate-fade-in" : "w-full rounded-2xl border border-accent/40 overflow-hidden bg-[#04060a] flex flex-col shadow-[0_0_40px_rgba(0,255,136,0.15)] my-2 font-mono"}>
       {/* Top Tactical Chart Bar */}
       <div className="flex flex-wrap items-center justify-between px-3.5 py-2.5 bg-surface/90 border-b border-border/50 text-[10px] gap-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -574,6 +774,19 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
             ⟲ 100%
           </button>
         </div>
+
+        {/* Pop-Out & Fullscreen Expand Button */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={"px-2.5 py-1 rounded transition font-bold border flex items-center gap-1.5 " + (
+            isExpanded
+              ? "bg-red-500/20 border-red-500/50 text-red-300 hover:bg-red-500/30"
+              : "bg-surface hover:bg-border/60 border-border/60 text-fg hover:text-accent"
+          )}
+          title={isExpanded ? "Exit Fullscreen" : "Pop Out & Expand Chart"}
+        >
+          <span>{isExpanded ? "✕ EXIT EXPAND" : "⛶ POP OUT"}</span>
+        </button>
 
         {/* Tickers */}
         <div className="flex items-center gap-1">
