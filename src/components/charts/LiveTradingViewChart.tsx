@@ -20,6 +20,18 @@ interface Props {
   height?: number;
 }
 
+interface DrawingItem {
+  id: string;
+  type: "trendline" | "ray" | "fib" | "box" | "measure";
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  startPrice: number;
+  endPrice: number;
+  color: string;
+}
+
 const TICKER_BUTTONS = [
   { id: "NVDA", label: "NVDA" },
   { id: "BTC", label: "BTC" },
@@ -79,6 +91,14 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   const [mounted, setMounted] = useState<boolean>(false);
   const [floatingZIndex, setFloatingZIndex] = useState<number>(999999);
   const [chartEngine, setChartEngine] = useState<"0ther5ide" | "tradingview">("0ther5ide");
+
+  // TradingView Style & Drawing State
+  const [candleStyle, setCandleStyle] = useState<"candles" | "hollow" | "line" | "area" | "heikin_ashi">("candles");
+  const [activeDrawTool, setActiveDrawTool] = useState<"cursor" | "trendline" | "ray" | "fib" | "box" | "measure">("cursor");
+  const [drawings, setDrawings] = useState<DrawingItem[]>([]);
+  const [isDrawingActive, setIsDrawingActive] = useState<boolean>(false);
+  const [currentDraftDrawing, setCurrentDraftDrawing] = useState<DrawingItem | null>(null);
+  const [showIndicatorModal, setShowIndicatorModal] = useState<boolean>(false);
 
   const bringToFront = () => {
     setFloatingZIndex(Date.now() % 1000000 + 999999);
@@ -241,14 +261,47 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (activeDrawTool !== "cursor") {
+      setIsDrawingActive(true);
+      const newDraft: DrawingItem = {
+        id: `draw-${Date.now()}`,
+        type: activeDrawTool as any,
+        startX: x,
+        startY: y,
+        endX: x,
+        endY: y,
+        startPrice: livePrice,
+        endPrice: livePrice,
+        color: "#00ff88",
+      };
+      setCurrentDraftDrawing(newDraft);
+      return;
+    }
+
     setIsDragging(true);
     setDragStartX(e.clientX);
   };
 
-  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseUp = () => {
+    if (isDrawingActive && currentDraftDrawing) {
+      setDrawings((d) => [...d, currentDraftDrawing]);
+      setCurrentDraftDrawing(null);
+      setIsDrawingActive(false);
+      return;
+    }
+    setIsDragging(false);
+  };
 
   const handleCanvasLeave = () => {
     setIsDragging(false);
+    setIsDrawingActive(false);
+    setCurrentDraftDrawing(null);
     setHoveredCandle(null);
     setMousePos(null);
   };
@@ -270,15 +323,29 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
   const handleTouchEnd = () => setLastTouchDist(null);
 
-  // Compute Visible Candle Window (From 2 sniper candles up to full 120+ macro history)
+  // Compute Visible Candle Window (With Heikin Ashi transformation support)
   const visibleCandles = useMemo(() => {
     const total = candles.length;
     const count = Math.max(2, Math.min(total, Math.round(total / zoomLevel)));
     const maxP = Math.max(0, total - count);
     const clampedP = Math.max(0, Math.min(maxP, panOffset));
     const start = Math.max(0, total - count - clampedP);
-    return candles.slice(start, start + count);
-  }, [candles, zoomLevel, panOffset]);
+    const rawSlice = candles.slice(start, start + count);
+
+    if (candleStyle === "heikin_ashi") {
+      const haList: Candle[] = [];
+      rawSlice.forEach((c, idx) => {
+        const haClose = +((c.open + c.high + c.low + c.close) / 4).toFixed(2);
+        const haOpen = idx === 0 ? +((c.open + c.close) / 2).toFixed(2) : +((haList[idx - 1].open + haList[idx - 1].close) / 2).toFixed(2);
+        const haHigh = Math.max(c.high, haOpen, haClose);
+        const haLow = Math.min(c.low, haOpen, haClose);
+        haList.push({ ...c, open: haOpen, close: haClose, high: haHigh, low: haLow });
+      });
+      return haList;
+    }
+
+    return rawSlice;
+  }, [candles, zoomLevel, panOffset, candleStyle]);
 
   // High-Definition Retina Canvas Renderer
   useEffect(() => {
@@ -466,34 +533,108 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       ctx.stroke();
     }
 
-    // 2. Draw Candlesticks with Glowing Bodies
-    visibleCandles.forEach((c, idx) => {
-      const x = 15 + idx * candleStride;
-      const isBull = c.close >= c.open;
-      const color = isBull ? "#00ff88" : "#ff3b5c";
-
-      const openY = priceAreaHeight - ((c.open - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
-      const closeY = priceAreaHeight - ((c.close - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
-      const highY = priceAreaHeight - ((c.high - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
-      const lowY = priceAreaHeight - ((c.low - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
-
-      // Wick
-      ctx.strokeStyle = color;
-      ctx.lineWidth = Math.max(1, Math.min(2.5, candleWidth * 0.15));
+    // 2. Draw Candlesticks with Style Variants (Candles, Hollow, Line, Area)
+    if (candleStyle === "line" || candleStyle === "area") {
+      ctx.strokeStyle = "#00e5ff";
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(x + candleWidth / 2, highY);
-      ctx.lineTo(x + candleWidth / 2, lowY);
+      visibleCandles.forEach((c, idx) => {
+        const x = 15 + idx * candleStride + candleWidth / 2;
+        const y = priceAreaHeight - ((c.close - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+        if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
       ctx.stroke();
 
-      // Body with subtle glow
-      const bodyY = Math.min(openY, closeY);
-      const bodyH = Math.max(2, Math.abs(closeY - openY));
+      if (candleStyle === "area") {
+        const firstX = 15 + candleWidth / 2;
+        const lastX = 15 + (visibleCandles.length - 1) * candleStride + candleWidth / 2;
+        ctx.lineTo(lastX, priceAreaHeight);
+        ctx.lineTo(firstX, priceAreaHeight);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, 0, 0, priceAreaHeight);
+        grad.addColorStop(0, "rgba(0, 229, 255, 0.3)");
+        grad.addColorStop(1, "rgba(0, 229, 255, 0.0)");
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+    } else {
+      visibleCandles.forEach((c, idx) => {
+        const x = 15 + idx * candleStride;
+        const isBull = c.close >= c.open;
+        const color = isBull ? "#00ff88" : "#ff3b5c";
 
-      ctx.fillStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = Math.min(6, Math.max(2, candleWidth * 0.2));
-      ctx.fillRect(x, bodyY, candleWidth, bodyH);
-      ctx.shadowBlur = 0;
+        const openY = priceAreaHeight - ((c.open - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+        const closeY = priceAreaHeight - ((c.close - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+        const highY = priceAreaHeight - ((c.high - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+        const lowY = priceAreaHeight - ((c.low - minPrice) / priceRange) * (priceAreaHeight - 30) + 15;
+
+        // Wick
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1, Math.min(2.5, candleWidth * 0.15));
+        ctx.beginPath();
+        ctx.moveTo(x + candleWidth / 2, highY);
+        ctx.lineTo(x + candleWidth / 2, lowY);
+        ctx.stroke();
+
+        // Body with subtle glow
+        const bodyY = Math.min(openY, closeY);
+        const bodyH = Math.max(2, Math.abs(closeY - openY));
+
+        if (candleStyle === "hollow" && isBull) {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x, bodyY, candleWidth, bodyH);
+        } else {
+          ctx.fillStyle = color;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = Math.min(6, Math.max(2, candleWidth * 0.2));
+          ctx.fillRect(x, bodyY, candleWidth, bodyH);
+          ctx.shadowBlur = 0;
+        }
+      });
+    }
+
+    // 8. User Drawings (Trendlines, Fibonacci, Boxes, Ruler)
+    const allDrawings = [...drawings, ...(currentDraftDrawing ? [currentDraftDrawing] : [])];
+    allDrawings.forEach((d) => {
+      ctx.strokeStyle = d.color || "#00ff88";
+      ctx.lineWidth = 1.6;
+
+      if (d.type === "trendline") {
+        ctx.beginPath();
+        ctx.moveTo(d.startX, d.startY);
+        ctx.lineTo(d.endX, d.endY);
+        ctx.stroke();
+      } else if (d.type === "ray") {
+        ctx.beginPath();
+        ctx.moveTo(0, d.startY);
+        ctx.lineTo(w - 65, d.startY);
+        ctx.stroke();
+      } else if (d.type === "box") {
+        ctx.fillStyle = "rgba(0, 255, 136, 0.12)";
+        ctx.fillRect(d.startX, d.startY, d.endX - d.startX, d.endY - d.startY);
+        ctx.strokeRect(d.startX, d.startY, d.endX - d.startX, d.endY - d.startY);
+      } else if (d.type === "fib") {
+        const fibRatios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+        const colors = ["#8892b0", "#38bdf8", "#00e5ff", "#ffd700", "#00ff88", "#f43f5e", "#a855f7"];
+        const dy = d.endY - d.startY;
+        fibRatios.forEach((r, idx) => {
+          const fy = d.startY + dy * r;
+          ctx.strokeStyle = colors[idx % colors.length];
+          ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(w - 65, fy); ctx.stroke();
+          ctx.fillStyle = colors[idx % colors.length];
+          ctx.font = "8px monospace";
+          ctx.fillText(`${(r * 100).toFixed(1)}%`, 10, fy - 2);
+        });
+      } else if (d.type === "measure") {
+        ctx.fillStyle = "rgba(0, 229, 255, 0.15)";
+        ctx.fillRect(d.startX, d.startY, d.endX - d.startX, d.endY - d.startY);
+        ctx.strokeRect(d.startX, d.startY, d.endX - d.startX, d.endY - d.startY);
+        ctx.fillStyle = "#00e5ff";
+        ctx.font = "bold 9px monospace";
+        const delta = Math.abs(d.endY - d.startY);
+        ctx.fillText(`📏 Δ ${delta.toFixed(1)}px · RULER`, Math.min(d.startX, d.endX) + 6, Math.min(d.startY, d.endY) + 14);
+      }
     });
 
     // 3. AI Order Block Lines (When Active)
@@ -1106,6 +1247,43 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
       {/* Main Canvas & Side Order Book Split Body */}
       <div className="flex-1 flex w-full relative min-h-[380px] bg-[#06090e]">
+        {/* Left-Side TradingView Drawing Tools Bar */}
+        {chartEngine === "0ther5ide" && (
+          <div className="w-[36px] bg-[#070a10] border-r border-border/50 flex flex-col items-center py-2 gap-2 text-muted select-none z-10">
+            {[
+              { id: "cursor", icon: "✛", label: "Crosshair Mode" },
+              { id: "trendline", icon: "╱", label: "Trend Line" },
+              { id: "ray", icon: "━", label: "Horizontal Ray" },
+              { id: "fib", icon: "≡", label: "Fibonacci Retracement" },
+              { id: "box", icon: "▭", label: "Order Block Box" },
+              { id: "measure", icon: "📏", label: "Measurement Ruler" },
+            ].map((tool) => (
+              <button
+                key={tool.id}
+                onClick={() => setActiveDrawTool(tool.id as any)}
+                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold transition ${
+                  activeDrawTool === tool.id
+                    ? "bg-accent/20 text-accent border border-accent/60 shadow-sm"
+                    : "hover:bg-surface hover:text-fg"
+                }`}
+                title={tool.label}
+              >
+                {tool.icon}
+              </button>
+            ))}
+
+            {drawings.length > 0 && (
+              <button
+                onClick={() => setDrawings([])}
+                className="w-7 h-7 rounded flex items-center justify-center text-xs text-red-400 hover:bg-red-500/20 border border-red-500/30 transition mt-auto"
+                title="Clear All Drawings"
+              >
+                🗑️
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Candlestick Chart Area (Dual Engine: Real TradingView Embed OR Custom 0ther5ide L3 Canvas) */}
         {chartEngine === "tradingview" ? (
           <div className="flex-1 relative h-full min-h-[380px] bg-[#06090e] flex flex-col">
@@ -1159,7 +1337,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
               {/* Spread Banner */}
               <div className="my-2 py-1 text-center bg-surface/80 rounded border border-border/40 font-bold text-fg text-[9px]">
-                SPREAD: ${(orderBookDOM.asks[0]?.price - orderBookDOM.bids[0]?.price || 0.05).toFixed(2)}
+                SPREAD: ${(orderBookDOM.asks[0]?.price - Math.abs(orderBookDOM.bids[0]?.price) || 0.05).toFixed(2)}
               </div>
 
               {/* Bids (Buys) */}
@@ -1168,7 +1346,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
                 {orderBookDOM.bids.slice(0, 4).map((b, i) => (
                   <div key={i} className="flex items-center justify-between relative overflow-hidden px-1 py-0.5 rounded bg-green-500/5">
                     <div className="absolute right-0 top-0 bottom-0 bg-green-500/15" style={{ width: `${Math.min(100, (b.size / 5000) * 100)}%` }} />
-                    <span className="text-green-400 font-bold relative z-10">${b.price.toFixed(2)}</span>
+                    <span className="text-green-400 font-bold relative z-10">${Math.abs(b.price).toFixed(2)}</span>
                     <span className="text-muted relative z-10">{b.size.toLocaleString()}</span>
                   </div>
                 ))}
@@ -1188,6 +1366,104 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
           </div>
         )}
       </div>
+
+      {/* Bottom Range Selector & Real-Time Clock Bar */}
+      <div className="flex items-center justify-between px-3 py-1 bg-[#070a10] border-t border-border/40 text-[9px] text-muted">
+        <div className="flex items-center gap-1.5">
+          {["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "ALL"].map((range) => (
+            <button
+              key={range}
+              onClick={handleResetZoom}
+              className="px-1.5 py-0.5 rounded hover:text-accent hover:bg-surface transition font-bold"
+            >
+              {range}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 font-mono">
+          <span className="w-1.5 h-1.5 rounded-full bg-accent signal-pulse" />
+          <span>REAL-TIME STREAMING · UTC-4</span>
+        </div>
+      </div>
+
+      {/* TradingView-Style Indicator Multi-Selection Modal */}
+      {showIndicatorModal && (
+        <div
+          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in font-mono"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowIndicatorModal(false); }}
+        >
+          <div className="w-full max-w-md bg-[#080c14] border border-accent/60 rounded-2xl shadow-2xl overflow-hidden text-xs">
+            <div className="flex items-center justify-between px-4 py-3 bg-surface/90 border-b border-border/50">
+              <div className="flex items-center gap-2 text-accent font-extrabold">
+                <span className="w-2.5 h-2.5 rounded-full bg-accent signal-pulse" />
+                <span>INDICATORS & PROPRIETARY STRATEGIES</span>
+              </div>
+              <button
+                onClick={() => setShowIndicatorModal(false)}
+                className="w-6 h-6 rounded bg-bg/80 border border-border/60 hover:text-red-400 text-muted flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 space-y-2.5 max-h-[70vh] overflow-y-auto">
+              {[
+                { name: "🎯 AI Bracket Target Levels", desc: "Entry Order Block, Take Profits & Stop Loss with live R:R", active: showAiSetup, toggle: () => { if (!isVipUser) { setPaywallFeature("AI Order Block Targets"); return; } setShowAiSetup(!showAiSetup); } },
+                { name: "📈 Dual EMA 20 & 50", desc: "Cyan/Gold moving averages with golden/death cross alerts", active: showEma, toggle: () => { if (!isVipUser) { setPaywallFeature("Dual EMA 20 & 50 Trends"); return; } setShowEma(!showEma); } },
+                { name: "🌐 Bollinger Bands (20, 2)", desc: "Dynamic volatility compression & mean reversion cloud", active: showBollinger, toggle: () => { if (!isVipUser) { setPaywallFeature("Bollinger Bands Volatility Clouds"); return; } setShowBollinger(!showBollinger); } },
+                { name: "⚡ Institutional VWAP", desc: "Volume Weighted Average Price anchor benchmark", active: showVwap, toggle: () => { if (!isVipUser) { setPaywallFeature("Institutional VWAP Benchmark"); return; } setShowVwap(!showVwap); } },
+                { name: "📊 RSI (14) Momentum Sub-Panel", desc: "Relative Strength Index with 70/30 overbought bounds", active: showRsi, toggle: () => { if (!isVipUser) { setPaywallFeature("RSI (14) Momentum Oscillator"); return; } setShowRsi(!showRsi); } },
+              ].map((ind, i) => (
+                <div
+                  key={i}
+                  onClick={ind.toggle}
+                  className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition ${
+                    ind.active ? "bg-accent/15 border-accent text-accent shadow-sm" : "bg-surface/50 border-border/40 text-muted hover:text-fg"
+                  }`}
+                >
+                  <div>
+                    <div className="font-bold text-xs">{ind.name}</div>
+                    <div className="text-[9.5px] text-muted mt-0.5">{ind.desc}</div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded font-bold text-[9px] ${ind.active ? "bg-accent text-bg" : "bg-bg text-muted border border-border/50"}`}>
+                    {ind.active ? "ON" : "OFF"}
+                  </span>
+                </div>
+              ))}
+
+              <div className="pt-2 border-t border-border/40 space-y-2">
+                <div className="text-[9.5px] text-accent font-bold uppercase">SPECIAL ADVANCED STRATEGIES:</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "cvd", label: "🌊 CVD Flow" },
+                    { id: "gex", label: "⚡ GEX Walls" },
+                    { id: "fvg", label: "🧱 Fair Value Gaps" },
+                    { id: "godmode_v3", label: "🔮 Godmode V3" },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        if (!isVipUser) {
+                          setPaywallFeature("Institutional Special Strategies");
+                          return;
+                        }
+                        setSpecialIndicator(specialIndicator === s.id ? "none" : (s.id as any));
+                      }}
+                      className={`p-2.5 rounded-lg border text-center font-bold text-[10px] transition ${
+                        specialIndicator === s.id
+                          ? "bg-purple-500/20 border-purple-400 text-purple-300 shadow-sm"
+                          : "bg-surface/60 border-border/40 text-muted hover:text-fg"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Paywall Modal for Locked Features */}
       {paywallFeature && (
