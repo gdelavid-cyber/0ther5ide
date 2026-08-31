@@ -29,7 +29,6 @@ const DEFAULT_HOTSPOTS: Signal[] = [
   { id: "def-5", type: "conflict", title: "Eastern Mediterranean Naval Concentration", country: "Cyprus", lat: 34.90, lng: 33.60, severity: 2, source: "AIS / OSINT", url: "https://gdeltproject.org", ts: new Date().toISOString(), tags: [] },
 ];
 
-// Convert Lat/Lng to 3D Cartesian coordinates on sphere radius R
 function latLngToVector3(lat: number, lng: number, radius: number = 100): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lng + 180) * (Math.PI / 180);
@@ -39,19 +38,18 @@ function latLngToVector3(lat: number, lng: number, radius: number = 100): THREE.
   return new THREE.Vector3(x, y, z);
 }
 
-// Generate an ultra-sharp procedural Earth texture with continents and night lights
 function createProceduralEarthTexture(): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 2048;
   canvas.height = 1024;
   const ctx = canvas.getContext("2d")!;
 
-  // Deep Space Ocean Base
-  ctx.fillStyle = "#060913";
+  // Deep Navy Tactical Ocean Base
+  ctx.fillStyle = "#070c18";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Subtle longitude & latitude tactical navigation grid
-  ctx.strokeStyle = "rgba(0, 255, 136, 0.08)";
+  // Tactical Lat / Lng Grid
+  ctx.strokeStyle = "rgba(0, 255, 136, 0.12)";
   ctx.lineWidth = 1;
   for (let x = 0; x < canvas.width; x += 64) {
     ctx.beginPath();
@@ -66,12 +64,11 @@ function createProceduralEarthTexture(): THREE.CanvasTexture {
     ctx.stroke();
   }
 
-  // Draw procedural landmass contours
-  ctx.fillStyle = "#0c1824";
+  // Major Continents Geometry
+  ctx.fillStyle = "#0e2030";
   ctx.strokeStyle = "#00ff88";
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
 
-  // Major continental landmass approximations (North America, South America, Eurasia, Africa, Australia)
   const landmasses = [
     // North America
     [[200, 200], [450, 150], [550, 300], [400, 450], [300, 480], [220, 350]],
@@ -96,9 +93,9 @@ function createProceduralEarthTexture(): THREE.CanvasTexture {
     ctx.stroke();
   });
 
-  // Add random city light clusters across land
-  ctx.fillStyle = "rgba(0, 255, 136, 0.7)";
-  for (let i = 0; i < 400; i++) {
+  // Dense Glowing City Lights
+  ctx.fillStyle = "#00ffaa";
+  for (let i = 0; i < 600; i++) {
     const rx = Math.random() * canvas.width;
     const ry = Math.random() * canvas.height;
     const size = Math.random() * 2 + 1;
@@ -113,7 +110,7 @@ function createProceduralEarthTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-export default function GodModeGlobe({ signals, height = 500 }: Props) {
+export default function GodModeGlobe({ signals, height = 480 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [isRotating, setIsRotating] = useState(true);
@@ -123,18 +120,21 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
     if (!containerRef.current || typeof window === "undefined") return;
     const container = containerRef.current;
     const w = container.clientWidth || 800;
-    const h = height || container.clientHeight || 500;
+    const h = height || container.clientHeight || 480;
 
     // 1. Scene & Camera Setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#06070a");
+    scene.background = new THREE.Color("#05070c");
 
     const camera = new THREE.PerspectiveCamera(45, w / h, 1, 2000);
-    camera.position.set(0, 50, 260);
+    camera.position.set(0, 40, 270);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+    renderer.domElement.style.display = "block";
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
@@ -142,43 +142,73 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.8;
+    controls.autoRotateSpeed = 0.7;
     controls.minDistance = 140;
     controls.maxDistance = 450;
     controlsRef.current = controls;
 
-    // 2. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    // 2. Dynamic Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     scene.add(ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0x00ff88, 1.2);
+    const dirLight1 = new THREE.DirectionalLight(0x00ff88, 1.5);
     dirLight1.position.set(200, 150, 200);
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0x4488ff, 0.9);
+    const dirLight2 = new THREE.DirectionalLight(0x0088ff, 1.2);
     dirLight2.position.set(-200, -100, -200);
     scene.add(dirLight2);
 
-    // 3. Globe Sphere Mesh (Radius = 100)
+    // 3. Deep Space Starfield Background
+    const starGeometry = new THREE.BufferGeometry();
+    const starCount = 800;
+    const starPositions = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i += 3) {
+      starPositions[i] = (Math.random() - 0.5) * 1200;
+      starPositions[i + 1] = (Math.random() - 0.5) * 1200;
+      starPositions[i + 2] = (Math.random() - 0.5) * 1200;
+    }
+    starGeometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+    const starMaterial = new THREE.PointsMaterial({
+      color: 0x88ccff,
+      size: 1.5,
+      transparent: true,
+      opacity: 0.6,
+    });
+    const starField = new THREE.Points(starGeometry, starMaterial);
+    scene.add(starField);
+
+    // 4. Globe Sphere & Tactical Wireframe Mesh
     const earthRadius = 100;
     const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
     const texture = createProceduralEarthTexture();
     const earthMaterial = new THREE.MeshStandardMaterial({
       map: texture,
-      roughness: 0.7,
-      metalness: 0.2,
-      emissive: new THREE.Color(0x02110c),
-      emissiveIntensity: 0.4,
+      roughness: 0.6,
+      metalness: 0.1,
+      emissive: new THREE.Color(0x002215),
+      emissiveIntensity: 0.5,
     });
     const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
     scene.add(earthMesh);
 
-    // 4. Volumetric Atmosphere Glow Sphere
-    const atmosphereGeometry = new THREE.SphereGeometry(earthRadius * 1.12, 48, 48);
+    // Wireframe overlay for high-tech holographic depth
+    const wireframeGeom = new THREE.SphereGeometry(earthRadius * 1.002, 32, 32);
+    const wireframeMat = new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.08,
+    });
+    const wireframeMesh = new THREE.Mesh(wireframeGeom, wireframeMat);
+    scene.add(wireframeMesh);
+
+    // Atmosphere Glow Halo
+    const atmosphereGeometry = new THREE.SphereGeometry(earthRadius * 1.15, 48, 48);
     const atmosphereMaterial = new THREE.MeshBasicMaterial({
       color: 0x00ff88,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.14,
       side: THREE.BackSide,
     });
     const atmosphereMesh = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
@@ -196,9 +226,9 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
 
     validSignals.forEach((s) => {
       const pos = latLngToVector3(s.lat, s.lng, earthRadius + 1.5);
-      const colorHex = s.severity === 0 ? 0xff4444 : s.severity === 1 ? 0xff8800 : 0x00ff88;
+      const colorHex = s.severity === 0 ? 0xff3333 : s.severity === 1 ? 0xff9900 : 0x00ff88;
 
-      // Solid Beacon Cylinder / Pin
+      // Solid Beacon Cylinder
       const pinGeom = new THREE.CylinderGeometry(0.8, 0.2, 8, 8);
       pinGeom.rotateX(Math.PI / 2);
       const pinMat = new THREE.MeshBasicMaterial({ color: colorHex });
@@ -210,7 +240,7 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
       interactiveObjects.push(pinMesh);
 
       // Glowing Beacon Sphere
-      const sphereGeom = new THREE.SphereGeometry(s.severity === 0 ? 3 : 2, 16, 16);
+      const sphereGeom = new THREE.SphereGeometry(s.severity === 0 ? 3.2 : 2.2, 16, 16);
       const sphereMat = new THREE.MeshBasicMaterial({ color: colorHex });
       const sphereMesh = new THREE.Mesh(sphereGeom, sphereMat);
       sphereMesh.position.copy(pos.clone().multiplyScalar(1.03));
@@ -219,11 +249,11 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
       interactiveObjects.push(sphereMesh);
 
       // Pulsing Radar Ring
-      const ringGeom = new THREE.RingGeometry(1.5, 3.5, 32);
+      const ringGeom = new THREE.RingGeometry(1.5, 3.8, 32);
       const ringMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.85,
         side: THREE.DoubleSide,
       });
       const ringMesh = new THREE.Mesh(ringGeom, ringMat);
@@ -251,9 +281,9 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
       const points = curve.getPoints(40);
       const arcGeom = new THREE.BufferGeometry().setFromPoints(points);
       const arcMat = new THREE.LineBasicMaterial({
-        color: i % 2 === 0 ? 0x00ff88 : 0xff4444,
+        color: i % 2 === 0 ? 0x00ff88 : 0xff3333,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.8,
       });
       const arcLine = new THREE.Line(arcGeom, arcMat);
       arcsGroup.add(arcLine);
@@ -285,13 +315,13 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
-      // Animate pulsing radar rings
+      // Pulse Radar Rings
       animatedRings.forEach((r) => {
         r.scale += r.speed;
         r.mesh.scale.set(r.scale, r.scale, r.scale);
         const mat = r.mesh.material as THREE.MeshBasicMaterial;
-        mat.opacity = Math.max(0, 1 - (r.scale - 1) / 3.5);
-        if (r.scale > 4.5) {
+        mat.opacity = Math.max(0, 1 - (r.scale - 1) / 3.8);
+        if (r.scale > 4.8) {
           r.scale = 1;
         }
       });
@@ -302,11 +332,11 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
 
     animate();
 
-    // 9. Resize Handling
+    // 9. Window & Resize Handling
     const handleResize = () => {
       if (!container) return;
       const newW = container.clientWidth || 800;
-      const newH = height || container.clientHeight || 500;
+      const newH = height || container.clientHeight || 480;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
@@ -339,11 +369,11 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
   };
 
   return (
-    <div className="w-full h-full relative rounded-xl border border-border/50 overflow-hidden glow-border bg-[#06070a] min-h-[380px]">
+    <div className="w-full h-full relative rounded-xl border border-border/50 overflow-hidden glow-border bg-[#05070c] min-h-[440px] flex flex-col">
       <div
         ref={containerRef}
-        className="globe-container w-full h-full min-h-[380px]"
-        style={{ height: `${height}px`, width: "100%" }}
+        className="globe-canvas-wrapper w-full h-full min-h-[440px] flex-1"
+        style={{ height: `${height}px`, width: "100%", display: "block" }}
       />
 
       {/* Top Left HUD Telemetry Overlay */}
