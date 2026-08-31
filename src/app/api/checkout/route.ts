@@ -12,7 +12,9 @@ export async function POST(request: NextRequest) {
 
     if (stripeKey && planTier === "vip") {
       // Production Stripe Integration
-      const Stripe = (await import("stripe" as any)).default;
+      let Stripe: any = null;
+      try { Stripe = eval('require')('stripe'); } catch {}
+      if (!Stripe) throw new Error('Stripe module not loaded');
       const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" as any });
       const origin = request.headers.get("origin") || "http://localhost:3000";
 

@@ -31,10 +31,7 @@ export default function AgentChat() {
   const [messages, setMessages] = useState<{ role: "user" | "bot"; content: string; model?: string; chartSymbol?: string }[]>([
     {
       role: "bot",
-      content: "0ther5ide INTELLIGENCE CO-PILOT ONLINE.
-I synthesize multi-sensor GEOINT, FININT (SEC Form 4 / Dark Pools), and SIGINT telemetry in real-time.
-
-Ask me to pull up live charts (e.g. \"Chart NVDA\", \"Chart BTC\"), assess conflict theater risks, or click below for a guided walkthrough.",
+      content: "0ther5ide INTELLIGENCE CO-PILOT ONLINE.\nI synthesize multi-sensor GEOINT, FININT (SEC Form 4 / Dark Pools), and SIGINT telemetry in real-time.\n\nAsk me to pull up live charts (e.g. \"Chart NVDA\", \"Chart BTC\"), assess conflict theater risks, or click below for a guided walkthrough.",
       model: "0ther5ide-core",
     },
   ]);
