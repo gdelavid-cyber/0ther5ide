@@ -5,7 +5,32 @@ import { logger } from "@/lib/logger";
 function generateHeuristicReply(query: string, analysis?: string): string {
   const upper = query.toUpperCase();
 
-  // 1. Casual / Conversational / Status Greetings
+  // 1. Terminal Guide & Educational Walkthrough
+  if (upper.match(/\b(GUIDE|HOW TO USE|EXPLAIN TERMINAL|HELP ME|WALKTHROUGH|TUTORIAL|WHAT IS THIS)\b/i)) {
+    return `0ther5ide INTELLIGENCE TERMINAL — OPERATOR FIELD GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Welcome Operator. Here is your tactical breakdown of every live module:
+
+1. 🌐 3D ORBITAL GLOBE
+   • Red/Orange Pins = Active kinetic conflicts (ACLED) and thermal infrared fire hotspots (NASA VIIRS).
+   • Cyan Trajectory Arcs = Active strategic communications & command vectors between major defense hubs.
+   • Click on ANY beacon on the globe to inspect real-time coordinates and source dispatches.
+
+2. 🐋 SEC EDGAR FORM 4 INSIDER TRACKER
+   • Tracks C-Suite executive stock purchases & dumps exceeding $1M+.
+   • Click "DECRYPT DOSSIER" on any insider to reveal their multi-year filing history, codename, and cumulative net buy/sell ratio.
+
+3. 📈 INSTITUTIONAL ORDER FLOW & DARK POOLS
+   • Analyzes off-exchange Block Trades and ADF dark pool absorption.
+   • GEX (Gamma Exposure) indicates whether market makers are suppressing or amplifying stock volatility.
+
+4. 📡 AUTONOMOUS AI SWARM
+   • 4 background agents (RECON, WHALE-HUNTER, ORBITAL-SENTINEL, SYNTHESIS-COMMANDER) automatically correlate satellite, market, and conflict data 24/7.
+
+💡 DIRECTIVE: Ask me to evaluate any ticker (e.g., "Analyze NVDA") or any theater (e.g., "Assess Red Sea risk").`;
+  }
+
+  // 2. Casual / Conversational / Status Greetings
   if (upper.match(/\b(HOW ARE YOU|HOW ARE U|HOWS IT GOING|STATUS|HELLO|HI|HEY|GREETINGS|WHO ARE YOU|WHO ARE U)\b/i)) {
     return `0ther5ide NEURAL TERMINAL ONLINE — OPERATIONAL STATUS: NOMINAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -23,7 +48,7 @@ function generateHeuristicReply(query: string, analysis?: string): string {
    Ready for tactical target analysis, stock ticker evaluation (e.g. NVDA, TSLA), or geopolitical threat assessment.`;
   }
 
-  // 2. Financial & Asset Evaluation
+  // 3. Financial & Asset Evaluation
   const isMarket = upper.match(/NVDA|AAPL|TSLA|BTC|ETH|SOL|AMZN|MSFT|GOOGL|MARKET|STOCK|CRYPTO|DARK POOL|INSIDER/i);
   if (isMarket) {
     const assetMatch = upper.match(/NVDA|AAPL|TSLA|BTC|ETH|SOL|AMZN|MSFT|GOOGL/i);
@@ -40,12 +65,13 @@ function generateHeuristicReply(query: string, analysis?: string): string {
 3. RISK ASSESSMENT: MODERATE
    Macro liquidity cross-currents present. Tight invalidation recommended below local high-volume node.
 
-4. TARGETS
+4. TARGETS & EXPLANATION
    • Target 1: Previous swing liquidity pool.
-   • Target 2: Macro continuation boundary (+14.2%).`;
+   • Target 2: Macro continuation boundary (+14.2%).
+   • Dark Pool Explanation: Over 62% of institutional volume executed off-exchange indicates stealth accumulation before public earnings.`;
   }
 
-  // 3. Geopolitical & Conflict Assessment
+  // 4. Geopolitical & Conflict Assessment
   const isGeopolitical = upper.match(/TAIWAN|RED SEA|UKRAINE|RUSSIA|CHINA|MIDDLE EAST|OIL|STRAIT|WAR|CONFLICT|HORMUZ|IRAN|ISRAEL|LEBANON/i);
   if (isGeopolitical) {
     return `0ther5ide TACTICAL ASSESSMENT — THEATER OF OPERATIONS
@@ -60,15 +86,15 @@ function generateHeuristicReply(query: string, analysis?: string): string {
 3. RISK ASSESSMENT: HIGH
    Supply chain vulnerability index at 78/100. Potential for shipping route rerouting and energy premium volatility.
 
-4. TARGETS & CONTINGENCIES
+4. TACTICAL TARGETS & GUIDANCE
    • Immediate: Monitor satellite SAR sweeps and AIS transponder dark-zones.
-   • Medium-Term: Rebalance exposure away from affected maritime vectors.`;
+   • Strategic Action: Rebalance exposure away from affected maritime vectors.`;
   }
 
-  // 4. General Strategic Intel Synthesis
+  // 5. General Strategic Intel Synthesis
   return `CLASSIFIED INTELLIGENCE SYNTHESIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. VERDICT: SURVEILLANCE & RECONNAISSANCE ACTIVE
+1. VERDICT: SURVEILLANCE & GUIDANCE ACTIVE
    Query indexed across global defense, financial, and orbital satellite telemetry streams.
 
 2. SYSTEM CONVERGENCE
@@ -76,14 +102,14 @@ function generateHeuristicReply(query: string, analysis?: string): string {
    • Active Sensors: 5/5 Streams Monitored
    • Global Tension Index: ELEVATED (Score: 68/100)
 
-3. TACTICAL SUMMARY
-   Multi-sensor correlation confirms heightened systemic sensitivity over the active 72-hour operational window.`;
+3. TACTICAL SUMMARY & NEXT STEPS
+   Multi-sensor correlation confirms heightened systemic sensitivity over the active 72-hour operational window. Ask me to guide you through specific coordinates or assets.`;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, analysis } = body;
+    const { messages, analysis, model: requestedModel } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return Response.json({ error: "Invalid request" }, { status: 400 });
@@ -94,8 +120,8 @@ export async function POST(req: NextRequest) {
     const openAIKey = process.env.OPENAI_API_KEY;
     const apiKey = openRouterKey || openAIKey;
 
-    // If no external API key is provided, return rich heuristic response immediately
-    if (!apiKey) {
+    // If local heuristic model is requested or no key provided
+    if (requestedModel === "0ther5ide-heuristic-v2" || !apiKey) {
       const reply = generateHeuristicReply(lastMessage, analysis);
       return Response.json({
         reply,
@@ -105,26 +131,27 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Try calling OpenRouter or OpenAI
+    // Try OpenRouter / OpenAI call
     try {
       const isOpenRouter = !!openRouterKey;
       const apiUrl = isOpenRouter
         ? "https://openrouter.ai/api/v1/chat/completions"
         : "https://api.openai.com/v1/chat/completions";
 
-      const model = process.env.OPENROUTER_MODEL || (isOpenRouter ? "nvidia/nemotron-3.5-lightning:free" : "gpt-4o-mini");
+      const model = requestedModel || process.env.OPENROUTER_MODEL || (isOpenRouter ? "nvidia/nemotron-3.5-lightning:free" : "gpt-4o-mini");
 
-      const systemPrompt = `You are 0ther5ide — a classified military & financial intelligence analysis terminal. You synthesize multi-sensor GEOINT, SIGINT, and FININT feeds.
+      const systemPrompt = `You are 0ther5ide — an elite military & financial intelligence analysis co-pilot and interactive terminal guide.
+Your purpose is twofold:
+1. Provide classified tactical analysis across GEOINT (satellite/conflict), FININT (SEC Form 4 insider trading, dark pools), and SIGINT.
+2. Guide, explain, and educate the operator on how to interpret intelligence data, financial indicators (GEX, dark pools, VWAP), and satellite hotspots in plain, insightful language.
 
-Current Intelligence Context: ${analysis || "Active Live Telemetry (ACLED conflict, NASA VIIRS thermal hotspots, SEC EDGAR Form 4 filings, and ADS-B vectors)"}
+Format your responses cleanly with:
+1. VERDICT / EXECUTIVE SUMMARY
+2. BREAKDOWN & GUIDED EXPLANATION
+3. KEY LEVELS, COORDINATES & INSIDER CLUSTERS
+4. ACTIONABLE DIRECTIVES & NEXT STEPS
 
-Format your response cleanly:
-1. VERDICT (Bullish / Bearish / Elevated Risk / Critical / Operational Status)
-2. KEY LEVELS & COORDINATES (Key price pivots or military choke points)
-3. RISK ASSESSMENT (Volatility, liquidity, escalation probabilities)
-4. TACTICAL TARGETS & ACTIONABLE SUMMARY
-
-Speak in concise, authoritative, classified intelligence style. Zero filler.`;
+Be concise, authoritative, and helpful. Always guide the user clearly.`;
 
       const response = await fetch(apiUrl, {
         method: "POST",
@@ -140,10 +167,10 @@ Speak in concise, authoritative, classified intelligence style. Zero filler.`;
             { role: "system", content: systemPrompt },
             ...messages.map((m: any) => ({ role: m.role === "bot" ? "assistant" : m.role, content: m.content })),
           ],
-          max_tokens: 600,
+          max_tokens: 700,
           temperature: 0.6,
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(9000),
       });
 
       if (response.ok) {
@@ -153,7 +180,7 @@ Speak in concise, authoritative, classified intelligence style. Zero filler.`;
           return Response.json({
             reply,
             model,
-            reasoning: `Generated via ${isOpenRouter ? "OpenRouter" : "OpenAI"} (${model})`,
+            reasoning: `Synthesized via ${isOpenRouter ? "OpenRouter" : "OpenAI"} (${model})`,
             usage: {
               promptTokens: data.usage?.prompt_tokens || 0,
               completionTokens: data.usage?.completion_tokens || 0,
@@ -162,9 +189,9 @@ Speak in concise, authoritative, classified intelligence style. Zero filler.`;
         }
       }
 
-      logger.warn("LLM API returned non-OK status, falling back to neural heuristic", { status: response.status });
+      logger.warn("LLM API returned non-OK status, falling back to heuristic guide", { status: response.status });
     } catch (llmErr) {
-      logger.warn("LLM provider unreachable, falling back to neural heuristic", {}, llmErr);
+      logger.warn("LLM provider unreachable, falling back to heuristic guide", {}, llmErr);
     }
 
     // Graceful seamless fallback
@@ -178,7 +205,7 @@ Speak in concise, authoritative, classified intelligence style. Zero filler.`;
   } catch (err: any) {
     logger.error("Chat Agent critical exception", {}, err);
     return Response.json({
-      reply: "0ther5ide NEURAL CORE ONLINE — Telemetry nominal. Ready for queries.",
+      reply: "0ther5ide NEURAL CORE ONLINE — Ready for tactical directives.",
       model: "0ther5ide-fallback",
     });
   }

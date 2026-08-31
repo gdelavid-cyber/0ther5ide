@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
+import AINotificationBar from "@/components/dashboard/AINotificationBar";
 import BootSequence from "@/components/BootSequence";
 import Navigation from "@/components/Navigation";
 import TensionIndex from "./TensionIndex";
@@ -95,7 +96,12 @@ export default function Dashboard() {
         {/* Tab-driven layout */}
         {activeTab === "all" && (
           <>
-            {/* Main Globe */}
+            {/* Live AI Intelligence Notification Bar */}
+          <div>
+            <AINotificationBar />
+          </div>
+
+          {/* Main Globe */}
             <div className="h-[420px] md:h-[500px]">
               <GodModeGlobe signals={signals} height={480} />
             </div>
