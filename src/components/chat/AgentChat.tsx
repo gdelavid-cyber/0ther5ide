@@ -53,9 +53,7 @@ export default function AgentChat() {
     const nextMessages = [...messages, { role: "user" as const, content: text, chartSymbol: ticker || undefined }];
     setMessages(nextMessages);
 
-    if (ticker) {
-      setActiveChartSymbol(ticker);
-    }
+    // ticker handled in nextMessages
 
     try {
       const res = await fetch("/api/chat", {
@@ -131,7 +129,7 @@ export default function AgentChat() {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [messages, busy, activeChartSymbol]);
+  }, [messages, busy, hiddenCharts]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
