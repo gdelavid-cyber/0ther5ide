@@ -202,7 +202,7 @@ export default function Dashboard() {
 
             {/* Bottom Row 2: Chart Analysis & Signal Guide */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <div className="h-[340px]">
+              <div className="min-h-[460px]">
                 <ChartAnalysis />
               </div>
               <div className="glass-panel p-4 flex flex-col justify-between">
