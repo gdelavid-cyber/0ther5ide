@@ -1,44 +1,145 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 
+interface Candle {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+const KRAKEN_PAIRS: Record<string, string> = {
+  BTC: "XBTUSD",
+  BITCOIN: "XBTUSD",
+  ETH: "ETHUSD",
+  ETHEREUM: "ETHUSD",
+  SOL: "SOLUSD",
+  SOLANA: "SOLUSD",
+  XAUUSD: "PAXGUSD",
+  GOLD: "PAXGUSD",
+  XAU: "PAXGUSD",
+};
+
+const YAHOO_SYMBOLS: Record<string, string> = {
+  NVDA: "NVDA",
+  TSLA: "TSLA",
+  SPY: "SPY",
+  AAPL: "AAPL",
+  MSFT: "MSFT",
+  AMZN: "AMZN",
+  GOOGL: "GOOGL",
+  GOLD: "GC=F",
+  XAUUSD: "GC=F",
+  XAU: "GC=F",
+};
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const rawSymbol = (searchParams.get("symbol") || "BTC").toUpperCase().replace(/[^A-Z]/g, "");
+  const rawSymbol = (searchParams.get("symbol") || "NVDA").toUpperCase().replace(/[^A-Z]/g, "");
 
   let currentPrice = 0;
   let change24h = 0;
   let high24h = 0;
   let low24h = 0;
-  let volume = 0;
-  const finnhubKey = process.env.FINNHUB_API_KEY || "daad3n9r01qvosod85ngdaad3n9r01qvosod85o0";
+  let candles: Candle[] = [];
+  let source = "Global Live Exchange";
 
-  // 1. Crypto & Gold Feeds (Coinbase Public Live API)
-  if (["BTC", "BITCOIN"].includes(rawSymbol)) {
+  // 1. Try Kraken Live Exchange Candles (Crypto & PAXG Gold)
+  if (KRAKEN_PAIRS[rawSymbol]) {
     try {
-      const res = await fetch("https://api.coinbase.com/v2/prices/BTC-USD/spot", { next: { revalidate: 3 } });
-      const data = await res.json();
-      currentPrice = parseFloat(data.data.amount) || 78400;
+      const pair = KRAKEN_PAIRS[rawSymbol];
+      const res = await fetch(`https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=15`, {
+        next: { revalidate: 3 },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.result) {
+          const pairKey = Object.keys(data.result)[0];
+          const raw = data.result[pairKey] as Array<[number, string, string, string, string, string, string, number]>;
+          if (raw && raw.length > 0) {
+            const recent = raw.slice(-42);
+            candles = recent.map((item) => {
+              const t = new Date(item[0] * 1000);
+              return {
+                time: t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                open: parseFloat(item[1]),
+                high: parseFloat(item[2]),
+                low: parseFloat(item[3]),
+                close: parseFloat(item[4]),
+                volume: Math.round(parseFloat(item[6])),
+              };
+            });
+
+            const last = candles[candles.length - 1];
+            const first = candles[0];
+            currentPrice = last.close;
+            change24h = +(((last.close - first.open) / first.open) * 100).toFixed(2);
+            high24h = Math.max(...candles.map((c) => c.high));
+            low24h = Math.min(...candles.map((c) => c.low));
+            source = `Kraken Live (${pair})`;
+          }
+        }
+      }
     } catch {}
-  } else if (["ETH", "ETHEREUM"].includes(rawSymbol)) {
+  }
+
+  // 2. If not crypto or if Kraken failed, fetch 100% Real Candles from Yahoo Finance Chart API
+  if (candles.length === 0) {
     try {
-      const res = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot", { next: { revalidate: 3 } });
-      const data = await res.json();
-      currentPrice = parseFloat(data.data.amount) || 2450;
+      const ySymbol = YAHOO_SYMBOLS[rawSymbol] || rawSymbol;
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${ySymbol}?interval=15m&range=5d`,
+        {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+          next: { revalidate: 3 },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const result = data.chart?.result?.[0];
+        if (result) {
+          const timestamps = result.timestamp || [];
+          const quote = result.indicators?.quote?.[0] || {};
+          const opens = quote.open || [];
+          const highs = quote.high || [];
+          const lows = quote.low || [];
+          const closes = quote.close || [];
+          const volumes = quote.volume || [];
+
+          const parsed: Candle[] = [];
+          for (let i = 0; i < timestamps.length; i++) {
+            if (closes[i] !== null && closes[i] !== undefined) {
+              const t = new Date(timestamps[i] * 1000);
+              parsed.push({
+                time: t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                open: +(opens[i] || closes[i]).toFixed(2),
+                high: +(highs[i] || closes[i]).toFixed(2),
+                low: +(lows[i] || closes[i]).toFixed(2),
+                close: +closes[i].toFixed(2),
+                volume: Math.round(volumes[i] || 1000),
+              });
+            }
+          }
+
+          if (parsed.length > 0) {
+            candles = parsed.slice(-42);
+            currentPrice = result.meta?.regularMarketPrice || candles[candles.length - 1].close;
+            const first = candles[0];
+            change24h = +(((currentPrice - first.open) / first.open) * 100).toFixed(2);
+            high24h = result.meta?.regularMarketDayHigh || Math.max(...candles.map((c) => c.high));
+            low24h = result.meta?.regularMarketDayLow || Math.min(...candles.map((c) => c.low));
+            source = `NASDAQ/NYSE Real-Time (${ySymbol})`;
+          }
+        }
+      }
     } catch {}
-  } else if (["SOL", "SOLANA"].includes(rawSymbol)) {
-    try {
-      const res = await fetch("https://api.coinbase.com/v2/prices/SOL-USD/spot", { next: { revalidate: 3 } });
-      const data = await res.json();
-      currentPrice = parseFloat(data.data.amount) || 154.2;
-    } catch {}
-  } else if (["XAUUSD", "GOLD", "XAU"].includes(rawSymbol)) {
-    try {
-      const res = await fetch("https://api.coinbase.com/v2/prices/PAXG-USD/spot", { next: { revalidate: 3 } });
-      const data = await res.json();
-      currentPrice = parseFloat(data.data.amount) || 2518.5;
-    } catch {}
-  } else {
-    // 2. US Equities (Finnhub Live API)
+  }
+
+  // 3. Fallback to Finnhub live quote if needed
+  if (currentPrice === 0 || candles.length === 0) {
+    const finnhubKey = process.env.FINNHUB_API_KEY || "daad3n9r01qvosod85ngdaad3n9r01qvosod85o0";
     try {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${rawSymbol}&token=${finnhubKey}`, { next: { revalidate: 3 } });
       if (res.ok) {
@@ -46,68 +147,23 @@ export async function GET(req: NextRequest) {
         if (q.c && q.c > 0) {
           currentPrice = q.c;
           change24h = q.dp || 0;
-          high24h = q.h || q.c * 1.02;
-          low24h = q.l || q.c * 0.98;
+          high24h = q.h || q.c;
+          low24h = q.l || q.c;
+          source = "Finnhub Live Quote";
         }
       }
     } catch {}
   }
 
-  // Fallback defaults if upstream is slow
-  if (currentPrice <= 0) {
-    const fallbacks: Record<string, number> = {
-      BTC: 78340.0,
-      ETH: 2446.0,
-      SOL: 154.2,
-      XAUUSD: 2518.5,
-      GOLD: 2518.5,
-      NVDA: 217.55,
-      TSLA: 214.2,
-      SPY: 546.8,
-      AAPL: 224.5,
-    };
-    currentPrice = fallbacks[rawSymbol] || 150.0;
-  }
-
-  // Build high-density 42-candle series anchored on the exact live price
-  const volatility = currentPrice > 1000 ? currentPrice * 0.003 : currentPrice * 0.008;
-  const candles = [];
-  const now = Date.now();
-  let running = currentPrice * (1 - (change24h || 1.2) / 100);
-
-  for (let i = 42; i >= 1; i--) {
-    const t = new Date(now - i * 15 * 60 * 1000);
-    const timeStr = t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const drift = (currentPrice - running) / i + (Math.random() - 0.48) * volatility * 1.8;
-    const open = +running.toFixed(2);
-    const close = +(open + drift).toFixed(2);
-    const high = +(Math.max(open, close) + Math.random() * volatility * 1.2).toFixed(2);
-    const low = +(Math.min(open, close) - Math.random() * volatility * 1.2).toFixed(2);
-    const vol = Math.floor(Math.random() * 85000 + 15000);
-
-    candles.push({ time: timeStr, open, high, low, close, volume: vol });
-    running = close;
-  }
-
-  // Last candle is the EXACT live market price
-  const lastTime = new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  candles.push({
-    time: lastTime,
-    open: running,
-    high: Math.max(running, currentPrice),
-    low: Math.min(running, currentPrice),
-    close: currentPrice,
-    volume: Math.floor(Math.random() * 20000 + 5000),
-  });
-
   return NextResponse.json({
     symbol: rawSymbol,
     price: currentPrice,
-    change24h: change24h || +(((currentPrice - candles[0].open) / candles[0].open) * 100).toFixed(2),
-    high: high24h || Math.max(...candles.map((c) => c.high)),
-    low: low24h || Math.min(...candles.map((c) => c.low)),
+    change24h,
+    high: high24h,
+    low: low24h,
     candles,
-    source: "Coinbase / Finnhub Real-Time",
+    candleCount: candles.length,
+    source,
     timestamp: new Date().toISOString(),
   });
 }
