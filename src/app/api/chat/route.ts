@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
-import { NextRequest } from 'next/server';
+import { NextRequest } from "next/server";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,17 +8,20 @@ export async function POST(req: NextRequest) {
     const { messages, analysis } = body;
 
     if (!messages || !Array.isArray(messages)) {
-      return Response.json({ error: 'Invalid request' }, { status: 400 });
+      return Response.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const lastMessage = (messages[messages.length - 1]?.content || '').toUpperCase();
-    const apiKey = process.env.OPENAI_API_KEY;
+    const lastMessage = (messages[messages.length - 1]?.content || "").toUpperCase();
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    const openAIKey = process.env.OPENAI_API_KEY;
+    const apiKey = openRouterKey || openAIKey;
 
+    // Tactical Heuristic Fallback when no API Key is provided
     if (!apiKey) {
       const isMarket = lastMessage.match(/NVDA|AAPL|TSLA|BTC|ETH|SOL|AMZN|MSFT|MARKET|STOCK|CRYPTO/i);
       const isGeopolitical = lastMessage.match(/TAIWAN|RED SEA|UKRAINE|RUSSIA|CHINA|MIDDLE EAST|OIL|STRAIT|WAR|CONFLICT/i);
 
-      let reply = '';
+      let reply = "";
       if (isMarket) {
         reply = `CLASSIFIED INTELLIGENCE SYNTHESIS — ASSET EVALUATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -69,57 +73,73 @@ export async function POST(req: NextRequest) {
 
       return Response.json({
         reply,
-        reasoning: '0ther5ide neural engine tactical heuristic synthesis.',
+        model: "0ther5ide-heuristic-v2",
+        reasoning: "0ther5ide neural engine tactical heuristic synthesis.",
         usage: { promptTokens: 42, completionTokens: 180 },
       });
     }
 
-    const prompt = `You are 0ther5ide — a classified intelligence analysis agent. You analyze geopolitical and market data.
+    // OpenRouter (or OpenAI fallback) Configuration
+    const isOpenRouter = !!openRouterKey;
+    const apiUrl = isOpenRouter
+      ? "https://openrouter.ai/api/v1/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
 
-Current analysis context: ${analysis || 'none'}
+    const model = process.env.OPENROUTER_MODEL || (isOpenRouter ? "meta-llama/llama-3.3-70b-instruct" : "gpt-4o-mini");
 
-User query: ${lastMessage}
+    const systemPrompt = `You are 0ther5ide — a classified military & financial intelligence analysis terminal. You synthesize multi-sensor GEOINT, SIGINT, and FININT feeds.
 
-Respond with concise, classified-level analysis. Format:
-1. VERDICT (Bullish/Bearish/Neutral)
-2. KEY LEVELS
-3. RISK ASSESSMENT
-4. TARGETS
+Current Intelligence Context: ${analysis || "Active Live Telemetry (ACLED conflict, NASA VIIRS thermal hotspots, SEC EDGAR Form 4 filings, and ADS-B vectors)"}
 
-Speak in classified operational language. No disclaimers.`;
+Format your response cleanly:
+1. VERDICT (Bullish / Bearish / Elevated Risk / Critical)
+2. KEY LEVELS & COORDINATES (Key price pivots or military choke points)
+3. RISK ASSESSMENT (Volatility, liquidity, escalation probabilities)
+4. TACTICAL TARGETS & ACTIONABLE SUMMARY
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+Speak in concise, authoritative, classified intelligence style. Zero filler.`;
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://0ther5ide.vercel.app",
+        "X-Title": "0ther5ide Intelligence Terminal",
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 500,
-        temperature: 0.7,
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages.map((m: any) => ({ role: m.role === "bot" ? "assistant" : m.role, content: m.content })),
+        ],
+        max_tokens: 600,
+        temperature: 0.6,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errText = await response.text().catch(() => "");
+      logger.error("LLM Provider API error", { status: response.status, errText });
+      throw new Error(`LLM Provider error: ${response.status}`);
     }
 
     const data = await response.json();
-    const reply = data.choices[0].message.content;
+    const reply = data.choices?.[0]?.message?.content || "Analysis unavailable.";
 
     return Response.json({
       reply,
-      reasoning: 'Analysis generated from classified intel feeds + pattern matching.',
+      model,
+      reasoning: `Generated via ${isOpenRouter ? "OpenRouter" : "OpenAI"} (${model})`,
       usage: {
         promptTokens: data.usage?.prompt_tokens || 0,
         completionTokens: data.usage?.completion_tokens || 0,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    logger.error("Chat Agent exception", {}, err);
     return Response.json(
-      { error: 'Agent failed', reply: 'Signal lost — agent unreachable.' },
+      { error: "Agent query failed", reply: "CLASSIFIED TRANSMISSION DISRUPTED — Switching to local heuristic synthesis." },
       { status: 500 }
     );
   }

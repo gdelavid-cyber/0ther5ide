@@ -55,7 +55,7 @@ export default function AgentChat() {
           <span className="text-accent font-bold text-sm">AGENT</span>
           <span className="w-1.5 h-1.5 rounded-full bg-accent signal-pulse" />
         </div>
-        <span className="text-[10px] text-muted">GPT-4o · classified</span>
+        <span className="text-[10px] text-muted">OpenRouter · classified</span>
       </div>
 
       <div id="agentChatLog" ref={logRef} className="flex-1 overflow-y-auto space-y-2 min-h-0 mb-3">
