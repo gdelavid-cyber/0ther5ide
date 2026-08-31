@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import LiveTradingViewChart from "@/components/charts/LiveTradingViewChart";
 
 const AVAILABLE_MODELS = [
   { id: "nvidia/nemotron-3.5-lightning:free", name: "NVIDIA Nemotron 3.5 (Free)", badge: "FREE" },
@@ -13,21 +14,27 @@ const AVAILABLE_MODELS = [
 ];
 
 const GUIDANCE_CHIPS = [
+  { label: "📈 Pull Live NVDA Chart", prompt: "Chart NVDA live candlestick feed and evaluate institutional order flow." },
+  { label: "🪙 Pull Live BTC Chart", prompt: "Chart BTC live price action and key support levels." },
   { label: "🧭 Guide Me Through Terminal", prompt: "Give me a guided walkthrough of this terminal and how to interpret each module." },
-  { label: "🐋 Explain Biggest Insider Filing", prompt: "Explain the biggest SEC Form 4 insider trade in the terminal and what it indicates." },
-  { label: "📈 Evaluate NVDA Dark Pool Flow", prompt: "Evaluate NVDA dark pool order flow, volume footprint, and institutional accumulation levels." },
-  { label: "🛰️ Analyze Satellite Anomaly Hotspots", prompt: "Analyze the latest NASA VIIRS thermal anomaly hotspots on the 3D globe." },
+  { label: "🐋 Explain Biggest Insider Trade", prompt: "Explain the biggest SEC Form 4 insider trade in the terminal and what it indicates." },
+  { label: "🛰️ Analyze Satellite Anomalies", prompt: "Analyze the latest NASA VIIRS thermal anomaly hotspots on the 3D globe." },
   { label: "🌐 Red Sea Maritime Risk", prompt: "Assess current maritime risk and escalation in the Bab-el-Mandeb / Red Sea corridor." },
 ];
 
+function extractTicker(text: string): string | null {
+  const match = text.match(/\b(NVDA|TSLA|BTC|ETH|SOL|AAPL|MSFT|AMZN|GOOGL|SPY|QQQ|GOLD|OIL)\b/i);
+  return match ? match[0].toUpperCase() : null;
+}
+
 export default function AgentChat() {
-  const [messages, setMessages] = useState<{ role: "user" | "bot"; content: string; model?: string }[]>([
+  const [messages, setMessages] = useState<{ role: "user" | "bot"; content: string; model?: string; chartSymbol?: string }[]>([
     {
       role: "bot",
       content: "0ther5ide INTELLIGENCE CO-PILOT ONLINE.
 I synthesize multi-sensor GEOINT, FININT (SEC Form 4 / Dark Pools), and SIGINT telemetry in real-time.
 
-Ask me to evaluate any stock ticker, assess conflict theater risks, or click below for a guided walkthrough.",
+Ask me to pull up live charts (e.g. \"Chart NVDA\", \"Chart BTC\"), assess conflict theater risks, or click below for a guided walkthrough.",
       model: "0ther5ide-core",
     },
   ]);
@@ -35,6 +42,7 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
   const [busy, setBusy] = useState(false);
   const [selectedModel, setSelectedModel] = useState("nvidia/nemotron-3.5-lightning:free");
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
+  const [activeChartSymbol, setActiveChartSymbol] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const sendMessage = async (overrideText?: string) => {
@@ -43,8 +51,13 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
     setInput("");
     setBusy(true);
 
-    const nextMessages = [...messages, { role: "user" as const, content: text }];
+    const ticker = extractTicker(text);
+    const nextMessages = [...messages, { role: "user" as const, content: text, chartSymbol: ticker || undefined }];
     setMessages(nextMessages);
+
+    if (ticker) {
+      setActiveChartSymbol(ticker);
+    }
 
     try {
       const res = await fetch("/api/chat", {
@@ -57,12 +70,14 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
         }),
       });
       const data = await res.json();
+      const botTicker = extractTicker(data.reply || "");
       setMessages((prev) => [
         ...prev,
         {
           role: "bot",
           content: data.reply || "Transmission completed with zero errors.",
           model: data.model || selectedModel,
+          chartSymbol: botTicker || ticker || undefined,
         },
       ]);
     } catch {
@@ -72,6 +87,7 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
           role: "bot",
           content: "0ther5ide LOCAL NEURAL CORE SYNTHESIS: Multi-domain sensor convergence active. Telemetry nominal.",
           model: "0ther5ide-heuristic-v2",
+          chartSymbol: ticker || undefined,
         },
       ]);
     }
@@ -90,18 +106,16 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
     }
 
     window.speechSynthesis.cancel();
-    // Strip markdown formatting symbols for clean speech audio
     const cleanText = text
       .replace(/[#*_•━]/g, " ")
-      .replace(/https?://S+/g, "link")
-      .replace(/s+/g, " ")
+      .replace(/https?:\/\/\S+/g, "link")
+      .replace(/\s+/g, " ")
       .trim();
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.rate = 1.05;
     utterance.pitch = 0.95;
 
-    // Pick deep/tactical voice if available
     const voices = window.speechSynthesis.getVoices();
     const englishVoice = voices.find((v) => v.lang.startsWith("en") && (v.name.includes("Male") || v.name.includes("Natural") || v.name.includes("Google")));
     if (englishVoice) {
@@ -119,7 +133,7 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [messages, busy]);
+  }, [messages, busy, activeChartSymbol]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -159,7 +173,7 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
         {messages.map((m, i) => (
           <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
-              className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs shadow-md ${
+              className={`max-w-[95%] rounded-xl px-3.5 py-2.5 text-xs shadow-md ${
                 m.role === "user"
                   ? "bg-accent/20 text-accent border border-accent/30 font-sans font-medium"
                   : "bg-surface/90 text-fg border border-border/60 backdrop-blur-md leading-relaxed whitespace-pre-wrap"
@@ -167,29 +181,59 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
             >
               {m.content}
 
+              {/* Inline Live TradingView Candlestick Chart if Ticker Present */}
+              {m.chartSymbol && (
+                <div className="mt-3 mb-1 w-full">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] text-accent font-bold font-mono">📈 LIVE MARKET STREAM: {m.chartSymbol}</span>
+                    <button
+                      onClick={() => setActiveChartSymbol(activeChartSymbol === m.chartSymbol ? null : m.chartSymbol!)}
+                      className="text-[9px] font-mono px-2 py-0.5 rounded bg-surface border border-border/50 hover:border-accent text-muted hover:text-accent transition"
+                    >
+                      {activeChartSymbol === m.chartSymbol ? "▲ HIDE CHART" : "▼ EXPAND CHART"}
+                    </button>
+                  </div>
+                  {activeChartSymbol === m.chartSymbol && (
+                    <div className="animate-fade-in">
+                      <LiveTradingViewChart symbol={m.chartSymbol} height={260} />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Bot Message Metadata & Audio Brief Button */}
               {m.role === "bot" && (
                 <div className="mt-2.5 pt-2 border-t border-border/30 flex items-center justify-between text-[10px] text-muted font-mono">
                   <span className="text-accent/80">⚡ {m.model || selectedModel}</span>
-                  <button
-                    onClick={() => speakBriefing(m.content, i)}
-                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition ${
-                      speakingIndex === i
-                        ? "bg-red-500/20 border-red-500/50 text-red-400 font-bold"
-                        : "bg-surface border-border/50 hover:border-accent/50 text-muted hover:text-accent"
-                    }`}
-                  >
-                    {speakingIndex === i ? (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
-                        <span>⏹ STOP AUDIO</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>🔊 VOICE BRIEF</span>
-                      </>
+                  <div className="flex items-center gap-2">
+                    {m.chartSymbol && (
+                      <button
+                        onClick={() => setActiveChartSymbol(activeChartSymbol === m.chartSymbol ? null : m.chartSymbol!)}
+                        className="px-2 py-0.5 rounded border border-border/50 hover:border-accent/50 text-accent text-[9px]"
+                      >
+                        📊 {activeChartSymbol === m.chartSymbol ? "HIDE CHART" : `CHART ${m.chartSymbol}`}
+                      </button>
                     )}
-                  </button>
+                    <button
+                      onClick={() => speakBriefing(m.content, i)}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition ${
+                        speakingIndex === i
+                          ? "bg-red-500/20 border-red-500/50 text-red-400 font-bold"
+                          : "bg-surface border-border/50 hover:border-accent/50 text-muted hover:text-accent"
+                      }`}
+                    >
+                      {speakingIndex === i ? (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
+                          <span>⏹ STOP AUDIO</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🔊 VOICE BRIEF</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -228,7 +272,7 @@ Ask me to evaluate any stock ticker, assess conflict theater risks, or click bel
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask for guidance, analyze NVDA, query conflict risk..."
+          placeholder="Chart NVDA, ask for guidance, query conflict risk..."
           className="flex-1 bg-surface border border-border/60 rounded-xl px-3.5 py-2 text-xs text-fg placeholder-muted/50 focus:outline-none focus:border-accent/60 font-mono shadow-inner"
         />
         <button

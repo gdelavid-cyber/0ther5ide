@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import AINotificationBar from "@/components/dashboard/AINotificationBar";
+import FloatingAssistant from "@/components/chat/FloatingAssistant";
 import BootSequence from "@/components/BootSequence";
 import Navigation from "@/components/Navigation";
 import TensionIndex from "./TensionIndex";
@@ -263,6 +264,7 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      <FloatingAssistant />
     </div>
   );
 }
