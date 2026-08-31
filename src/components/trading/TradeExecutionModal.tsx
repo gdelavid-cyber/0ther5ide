@@ -22,7 +22,7 @@ export default function TradeExecutionModal({
   tp2Price,
   onClose,
 }: Props) {
-  const [selectedBroker, setSelectedBroker] = useState<"PAPER" | "ALPACA" | "KRAKEN" | "COINBASE">("PAPER");
+  const [selectedBroker, setSelectedBroker] = useState<"PAPER" | "ALPACA" | "KRAKEN" | "COINBASE" | "WEB3_WALLET">("PAPER");
   const [capitalAllocation, setCapitalAllocation] = useState<number>(5000);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [executionResult, setExecutionResult] = useState<string | null>(null);
@@ -98,31 +98,32 @@ export default function TradeExecutionModal({
             </div>
           </div>
 
-          {/* Broker Route Selection */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] text-muted font-bold tracking-wider uppercase">SELECT ROUTING BROKER:</div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { id: "PAPER", label: "PAPER SIM", badge: "0-RISK" },
-                { id: "ALPACA", label: "ALPACA", badge: "US EQUITIES" },
-                { id: "KRAKEN", label: "KRAKEN", badge: "CRYPTO/GOLD" },
-                { id: "COINBASE", label: "COINBASE", badge: "PRO SPOT" },
-              ].map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => setSelectedBroker(b.id as any)}
-                  className={`p-2 rounded-lg border text-left transition flex flex-col justify-between ${
-                    selectedBroker === b.id
-                      ? "bg-accent/15 border-accent text-accent shadow-sm"
-                      : "bg-surface/60 border-border/40 text-muted hover:text-fg"
-                  }`}
-                >
-                  <div className="font-bold text-[10px]">{b.label}</div>
-                  <div className="text-[8px] opacity-70 mt-0.5">{b.badge}</div>
-                </button>
-              ))}
+            {/* Broker Route Selection */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] text-muted font-bold tracking-wider uppercase">SELECT ROUTING BROKER:</div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {[
+                  { id: "PAPER", label: "PAPER SIM", badge: "0-RISK" },
+                  { id: "WEB3_WALLET", label: "WEB3 WALLET", badge: "ON-CHAIN" },
+                  { id: "ALPACA", label: "ALPACA", badge: "US STOCKS" },
+                  { id: "KRAKEN", label: "KRAKEN", badge: "CRYPTO/GOLD" },
+                  { id: "COINBASE", label: "COINBASE", badge: "PRO SPOT" },
+                ].map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => setSelectedBroker(b.id as any)}
+                    className={`p-2 rounded-lg border text-left transition flex flex-col justify-between ${
+                      selectedBroker === b.id
+                        ? "bg-accent/15 border-accent text-accent shadow-sm"
+                        : "bg-surface/60 border-border/40 text-muted hover:text-fg"
+                    }`}
+                  >
+                    <div className="font-bold text-[9.5px] truncate">{b.label}</div>
+                    <div className="text-[8px] opacity-70 mt-0.5">{b.badge}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
           {/* Sizing & Position Allocation */}
           <div className="p-3.5 rounded-xl bg-bg/80 border border-border/40 space-y-3">
