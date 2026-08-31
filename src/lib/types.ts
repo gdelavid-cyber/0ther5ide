@@ -39,6 +39,7 @@ export interface RegionTension {
 export interface InsiderTrade {
   id: string;
   person: string;
+  role?: string;
   company: string;
   ticker: string;
   action: 'buy' | 'sell';
@@ -46,10 +47,10 @@ export interface InsiderTrade {
   price: number;
   value: number;
   filedAt: string;
-  source: string;
-  notable: boolean;
-  cik: string;
-  tags: SignalTag[];
+  source?: string;
+  notable?: boolean;
+  cik?: string;
+  tags?: SignalTag[];
 }
 
 export interface InsiderDossier {

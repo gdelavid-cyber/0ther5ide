@@ -1,15 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db/store";
 import { createSessionToken, getServerSession } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-
-const LoginSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1).default("Operator"),
-  avatar: z.string().url().optional(),
-});
 
 export async function GET() {
   try {
@@ -23,17 +16,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const parsed = LoginSchema.safeParse(body);
+    const body = await request.json().catch(() => ({}));
+    const email = body.email;
+    const name = body.name || "Operator";
+    const avatar = body.avatar;
 
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid payload", details: parsed.error.format() }, { status: 400 });
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
 
     const user = await db.upsertUser({
-      email: parsed.data.email,
-      name: parsed.data.name,
-      avatar: parsed.data.avatar,
+      email,
+      name,
+      avatar,
     });
 
     const token = await createSessionToken({ email: user.email, name: user.name });

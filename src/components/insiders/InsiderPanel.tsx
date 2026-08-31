@@ -53,7 +53,7 @@ export default function InsiderPanel() {
     setSelectedDossier({
       name: trade.person,
       codename: "TARGET-" + trade.ticker,
-      cik: trade.cik,
+      cik: trade.cik || "0001045810",
       totalFilings: 18,
       ytdVolume: trade.value * 3.4,
       ytdNet: trade.action === "buy" ? trade.value : -trade.value,
