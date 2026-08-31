@@ -10,6 +10,15 @@ interface Candle {
   volume: number;
 }
 
+interface CachedPayload {
+  data: any;
+  expiresAt: number;
+}
+
+// In-Memory High-Concurrency Buffer (Eliminates Upstream Rate-Limits)
+const SHARED_CACHE = new Map<string, CachedPayload>();
+const CACHE_TTL_MS = 2500; // 2.5 seconds shared window
+
 const KRAKEN_PAIRS: Record<string, string> = {
   BTC: "XBTUSD",
   BITCOIN: "XBTUSD",
@@ -39,6 +48,13 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const rawSymbol = (searchParams.get("symbol") || "NVDA").toUpperCase().replace(/[^A-Z]/g, "");
 
+  // Check Shared In-Memory Buffer
+  const now = Date.now();
+  const cached = SHARED_CACHE.get(rawSymbol);
+  if (cached && cached.expiresAt > now) {
+    return NextResponse.json(cached.data);
+  }
+
   let currentPrice = 0;
   let change24h = 0;
   let high24h = 0;
@@ -46,7 +62,7 @@ export async function GET(req: NextRequest) {
   let candles: Candle[] = [];
   let source = "Global Live Exchange";
 
-  // 1. Try Kraken Live Exchange Candles (Crypto & PAXG Gold)
+  // 1. Try Kraken Live Exchange (Crypto & PAXG Gold)
   if (KRAKEN_PAIRS[rawSymbol]) {
     try {
       const pair = KRAKEN_PAIRS[rawSymbol];
@@ -85,7 +101,7 @@ export async function GET(req: NextRequest) {
     } catch {}
   }
 
-  // 2. If not crypto or if Kraken failed, fetch 100% Real Candles from Yahoo Finance Chart API
+  // 2. Try NASDAQ / NYSE SIP via Yahoo Finance
   if (candles.length === 0) {
     try {
       const ySymbol = YAHOO_SYMBOLS[rawSymbol] || rawSymbol;
@@ -155,7 +171,7 @@ export async function GET(req: NextRequest) {
     } catch {}
   }
 
-  return NextResponse.json({
+  const payload = {
     symbol: rawSymbol,
     price: currentPrice,
     change24h,
@@ -165,5 +181,10 @@ export async function GET(req: NextRequest) {
     candleCount: candles.length,
     source,
     timestamp: new Date().toISOString(),
-  });
+  };
+
+  // Cache snapshot for 2.5s to serve high-concurrency traffic
+  SHARED_CACHE.set(rawSymbol, { data: payload, expiresAt: now + CACHE_TTL_MS });
+
+  return NextResponse.json(payload);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import TradeExecutionModal from "@/components/trading/TradeExecutionModal";
 
 interface Candle {
   time: string;
@@ -46,6 +47,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
   // Crosshair Hover State
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [showExecutionModal, setShowExecutionModal] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -507,6 +509,10 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
   const latest = candles[candles.length - 1] || { close: 150, open: 150, high: 150, low: 150, volume: 50000 };
   const currentPrice = livePrice || latest.close;
   const isPositive = liveChange >= 0;
+  const entryPrice = +(currentPrice * 0.993).toFixed(2);
+  const stopLossPrice = +(currentPrice * 0.974).toFixed(2);
+  const tp1Price = +(currentPrice * 1.045).toFixed(2);
+  const tp2Price = +(currentPrice * 1.082).toFixed(2);
 
   const displayTicker =
     activeSymbol === "XAUUSD" || activeSymbol === "GOLD" || activeSymbol === "XAU"
@@ -565,6 +571,12 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
             🎯 AI TARGETS
           </button>
           <button
+            onClick={() => setShowExecutionModal(true)}
+            className="px-2.5 py-0.5 rounded transition font-extrabold bg-gradient-to-r from-accent to-emerald-400 text-bg shadow-sm hover:brightness-110 active:scale-95"
+          >
+            ⚡ EXECUTE AI SETUP
+          </button>
+          <button
             onClick={() => setShowEma(!showEma)}
             className={`px-2 py-0.5 rounded transition font-bold border ${
               showEma ? "bg-cyan-500/20 border-cyan-400 text-cyan-300" : "border-border/40 text-muted hover:text-fg"
@@ -618,6 +630,19 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
           className="w-full h-auto block rounded"
         />
       </div>
+
+      {/* 1-Click Institutional Execution Modal */}
+      {showExecutionModal && (
+        <TradeExecutionModal
+          symbol={activeSymbol}
+          currentPrice={currentPrice}
+          entryPrice={entryPrice}
+          stopLossPrice={stopLossPrice}
+          tp1Price={tp1Price}
+          tp2Price={tp2Price}
+          onClose={() => setShowExecutionModal(false)}
+        />
+      )}
 
       {/* Feed Source Bar */}
       <div className="flex items-center justify-between px-3 py-1 bg-surface/50 text-[8.5px] text-muted border-t border-border/30">

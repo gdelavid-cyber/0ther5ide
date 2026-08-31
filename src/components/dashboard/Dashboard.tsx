@@ -278,6 +278,31 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* Mobile Bottom Navigation Dock (Optimized for Smartphone Operators) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#06080d]/95 border-t border-border/60 backdrop-blur-xl px-2 py-2 flex items-center justify-around font-mono text-[9px]">
+        {[
+          { id: "all", label: "OVERVIEW", icon: "⊞" },
+          { id: "globe", label: "GLOBE", icon: "◎" },
+          { id: "agent", label: "AI CO-PILOT", icon: "🤖" },
+          { id: "flow", label: "FLOW", icon: "⚡" },
+          { id: "poly", label: "POLY", icon: "🔮" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg transition ${
+              activeTab === t.id
+                ? "bg-accent/20 text-accent font-bold border border-accent/40"
+                : "text-muted hover:text-fg"
+            }`}
+          >
+            <span className="text-xs">{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
       <FloatingAssistant />
     </div>
   );
