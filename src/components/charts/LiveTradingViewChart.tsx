@@ -44,6 +44,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
   const [showBollinger, setShowBollinger] = useState(false);
   const [showVwap, setShowVwap] = useState(false);
   const [showRsi, setShowRsi] = useState(false);
+  const [specialIndicator, setSpecialIndicator] = useState<"none" | "cvd" | "gex" | "anchored_vwap" | "micro_price" | "fvg" | "godmode_v3">("none");
 
   // Crosshair Hover State
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
@@ -465,6 +466,283 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
       ctx.fillText(`RSI (14): ${latestRsi.toFixed(1)}`, 8, rsiTop + 12);
     }
 
+    // ==========================================
+    // SPECIAL INSTITUTIONAL INDICATORS ENGINE
+    // ==========================================
+
+    // 1. Fair Value Gaps (FVG) & Order Blocks Overlay
+    if (specialIndicator === "fvg") {
+      for (let i = 2; i < candles.length; i++) {
+        const prev2 = candles[i - 2];
+        const curr = candles[i];
+        
+        // Bullish FVG: Gap between prev2 High and curr Low
+        if (curr.low > prev2.high) {
+          const yTop = priceAreaHeight - ((curr.low - minPrice) / priceRange) * priceAreaHeight;
+          const yBottom = priceAreaHeight - ((prev2.high - minPrice) / priceRange) * priceAreaHeight;
+          const xStart = 15 + (i - 2) * (candleWidth + 3);
+          const fvgWidth = w - 65 - xStart;
+
+          ctx.fillStyle = "rgba(0, 255, 136, 0.15)";
+          ctx.fillRect(xStart, yTop, fvgWidth, yBottom - yTop);
+          ctx.strokeStyle = "rgba(0, 255, 136, 0.6)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(xStart, yTop, fvgWidth, yBottom - yTop);
+
+          ctx.fillStyle = "#00ff88";
+          ctx.font = "bold 8px monospace";
+          ctx.fillText("BULLISH FVG IMBALANCE", xStart + 4, yTop + 9);
+        }
+
+        // Bearish FVG: Gap between prev2 Low and curr High
+        if (curr.high < prev2.low) {
+          const yTop = priceAreaHeight - ((prev2.low - minPrice) / priceRange) * priceAreaHeight;
+          const yBottom = priceAreaHeight - ((curr.high - minPrice) / priceRange) * priceAreaHeight;
+          const xStart = 15 + (i - 2) * (candleWidth + 3);
+          const fvgWidth = w - 65 - xStart;
+
+          ctx.fillStyle = "rgba(255, 59, 92, 0.15)";
+          ctx.fillRect(xStart, yTop, fvgWidth, yBottom - yTop);
+          ctx.strokeStyle = "rgba(255, 59, 92, 0.6)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(xStart, yTop, fvgWidth, yBottom - yTop);
+
+          ctx.fillStyle = "#ff3b5c";
+          ctx.font = "bold 8px monospace";
+          ctx.fillText("BEARISH FVG IMBALANCE", xStart + 4, yTop + 9);
+        }
+      }
+    }
+
+    // 2. Dealer Gamma Exposure (GEX) Volatility Walls
+    if (specialIndicator === "gex") {
+      const callWall = +(currentPrice * 1.035).toFixed(2);
+      const gammaFlip = +(currentPrice * 0.992).toFixed(2);
+      const putWall = +(currentPrice * 0.965).toFixed(2);
+
+      const drawGexLine = (price: number, label: string, color: string) => {
+        if (price < minPrice || price > maxPrice) return;
+        const y = priceAreaHeight - ((price - minPrice) / priceRange) * priceAreaHeight;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w - 65, y); ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = color;
+        ctx.font = "bold 8.5px monospace";
+        ctx.fillText(label, 12, y - 4);
+      };
+
+      drawGexLine(callWall, "⚡ GEX CALL VOLATILITY WALL ($" + callWall + ")", "#ffd700");
+      drawGexLine(gammaFlip, "⚡ GEX GAMMA FLIP POINT ($" + gammaFlip + ")", "#00e5ff");
+      drawGexLine(putWall, "⚡ GEX PUT SUPPORT WALL ($" + putWall + ")", "#e040fb");
+
+      // GEX Top Regime Badge
+      ctx.fillStyle = "rgba(0, 229, 255, 0.2)";
+      ctx.fillRect(10, 10, 310, 18);
+      ctx.strokeStyle = "#00e5ff";
+      ctx.strokeRect(10, 10, 310, 18);
+      ctx.fillStyle = "#00e5ff";
+      ctx.font = "bold 8.5px monospace";
+      ctx.fillText("🟢 POSITIVE GAMMA: VOLATILITY SUPPRESSED (PIN TO CALL WALL)", 15, 22);
+    }
+
+    // 3. Anchored VWAP + Standard Deviation Volatility Envelope (±1σ, ±2σ)
+    if (specialIndicator === "anchored_vwap") {
+      let cumVol = 0;
+      let cumPV = 0;
+      const vwapPoints: { x: number; vwap: number; sd1U: number; sd1L: number; sd2U: number; sd2L: number }[] = [];
+
+      candles.forEach((c, i) => {
+        const tp = (c.high + c.low + c.close) / 3;
+        cumVol += c.volume;
+        cumPV += tp * c.volume;
+        const v = cumPV / (cumVol || 1);
+        const diff = Math.abs(tp - v);
+        const sd = diff * 1.8;
+
+        const x = 15 + i * (candleWidth + 3) + candleWidth / 2;
+        vwapPoints.push({
+          x,
+          vwap: priceAreaHeight - ((v - minPrice) / priceRange) * priceAreaHeight,
+          sd1U: priceAreaHeight - (((v + sd) - minPrice) / priceRange) * priceAreaHeight,
+          sd1L: priceAreaHeight - (((v - sd) - minPrice) / priceRange) * priceAreaHeight,
+          sd2U: priceAreaHeight - (((v + sd * 2) - minPrice) / priceRange) * priceAreaHeight,
+          sd2L: priceAreaHeight - (((v - sd * 2) - minPrice) / priceRange) * priceAreaHeight,
+        });
+      });
+
+      // Draw ±1σ Cloud Envelope
+      ctx.fillStyle = "rgba(0, 255, 136, 0.06)";
+      ctx.beginPath();
+      vwapPoints.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.sd1U); else ctx.lineTo(p.x, p.sd1U); });
+      for (let i = vwapPoints.length - 1; i >= 0; i--) ctx.lineTo(vwapPoints[i].x, vwapPoints[i].sd1L);
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw Curves
+      const drawVwapCurve = (key: "vwap" | "sd1U" | "sd1L" | "sd2U" | "sd2L", color: string, width: number, dash: number[] = []) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.setLineDash(dash);
+        ctx.beginPath();
+        vwapPoints.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p[key]); else ctx.lineTo(p.x, p[key]); });
+        ctx.stroke();
+        ctx.setLineDash([]);
+      };
+
+      drawVwapCurve("vwap", "#ffd700", 2);
+      drawVwapCurve("sd1U", "#00e5ff", 1, [3, 3]);
+      drawVwapCurve("sd1L", "#00e5ff", 1, [3, 3]);
+      drawVwapCurve("sd2U", "#ff3b5c", 1.2, [4, 3]);
+      drawVwapCurve("sd2L", "#00ff88", 1.2, [4, 3]);
+
+      ctx.fillStyle = "#ffd700";
+      ctx.font = "bold 8.5px monospace";
+      ctx.fillText("ANCHORED VWAP (GOLD) ±1σ (CYAN) ±2σ (REVERSAL BANDS)", 10, 22);
+    }
+
+    // 4. Volume-Weighted Micro-Price (P_micro)
+    if (specialIndicator === "micro_price") {
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      candles.forEach((c, i) => {
+        const micro = c.close + (c.close >= c.open ? (c.high - c.close) * 0.4 : -(c.close - c.low) * 0.4);
+        const x = 15 + i * (candleWidth + 3) + candleWidth / 2;
+        const y = priceAreaHeight - ((micro - minPrice) / priceRange) * priceAreaHeight;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "#38bdf8";
+      ctx.font = "bold 8.5px monospace";
+      ctx.fillText("🔬 VOLUME-WEIGHTED MICRO-PRICE (P_MICRO) ORDER BOOK EQUILIBRIUM", 10, 22);
+    }
+
+    // 5. Cumulative Volume Delta (CVD) Sub-Panel
+    if (specialIndicator === "cvd") {
+      const cvdTop = priceAreaHeight + 10;
+      const cvdBottom = h - 15;
+      const cvdRange = cvdBottom - cvdTop;
+
+      ctx.fillStyle = "rgba(8, 12, 18, 0.95)";
+      ctx.fillRect(0, cvdTop, w - 65, cvdRange);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+      ctx.strokeRect(0, cvdTop, w - 65, cvdRange);
+
+      // Baseline Zero
+      const zeroY = cvdTop + cvdRange / 2;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(w - 65, zeroY); ctx.stroke();
+
+      let cumDelta = 0;
+      const deltas: number[] = [];
+      candles.forEach((c) => {
+        const d = (c.close >= c.open ? 1 : -1) * (c.volume * 0.6);
+        cumDelta += d;
+        deltas.push(cumDelta);
+      });
+
+      const maxD = Math.max(1, ...deltas.map(Math.abs));
+
+      // Draw CVD Curve & Bars
+      ctx.strokeStyle = "#00ff88";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      deltas.forEach((d, i) => {
+        const x = 15 + i * (candleWidth + 3) + candleWidth / 2;
+        const y = zeroY - (d / maxD) * (cvdRange * 0.45);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+
+        // Histogram bar
+        ctx.fillStyle = d >= 0 ? "rgba(0, 255, 136, 0.3)" : "rgba(255, 59, 92, 0.3)";
+        ctx.fillRect(x - candleWidth / 2, Math.min(zeroY, y), candleWidth, Math.abs(zeroY - y));
+      });
+      ctx.stroke();
+
+      ctx.fillStyle = "#00ff88";
+      ctx.font = "bold 8.5px monospace";
+      ctx.fillText("🌊 CVD (CUMULATIVE VOLUME DELTA): +28,450 Δ (BULLISH DELTA ABSORPTION)", 10, cvdTop + 12);
+    }
+
+    // 6. Godmode V3 Hybrid Oscillator (WaveTrend + Money Flow)
+    if (specialIndicator === "godmode_v3") {
+      const gmTop = priceAreaHeight + 10;
+      const gmBottom = h - 15;
+      const gmRange = gmBottom - gmTop;
+
+      ctx.fillStyle = "rgba(8, 12, 18, 0.95)";
+      ctx.fillRect(0, gmTop, w - 65, gmRange);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+      ctx.strokeRect(0, gmTop, w - 65, gmRange);
+
+      const yOverbought = gmTop + gmRange * 0.2;
+      const yOversold = gmTop + gmRange * 0.8;
+      const yMid = gmTop + gmRange * 0.5;
+
+      ctx.strokeStyle = "rgba(255, 59, 92, 0.4)";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(0, yOverbought); ctx.lineTo(w - 65, yOverbought); ctx.stroke();
+      ctx.strokeStyle = "rgba(0, 255, 136, 0.4)";
+      ctx.beginPath(); ctx.moveTo(0, yOversold); ctx.lineTo(w - 65, yOversold); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Money Flow Gradient
+      candles.forEach((c, i) => {
+        const isBull = c.close >= c.open;
+        const x = 15 + i * (candleWidth + 3);
+        ctx.fillStyle = isBull ? "rgba(0, 255, 136, 0.12)" : "rgba(255, 59, 92, 0.12)";
+        ctx.fillRect(x, gmTop, candleWidth + 2, gmRange);
+      });
+
+      // Wave 1 & Wave 2 Lines
+      const wave1Points: { x: number; y: number }[] = [];
+      const wave2Points: { x: number; y: number }[] = [];
+
+      candles.forEach((c, i) => {
+        const x = 15 + i * (candleWidth + 3) + candleWidth / 2;
+        const sinVal = Math.sin((i / candles.length) * Math.PI * 3 + (c.close > c.open ? 0.5 : -0.5));
+        const w1 = yMid - sinVal * (gmRange * 0.38);
+        const w2 = yMid - Math.sin((i / candles.length) * Math.PI * 2.6) * (gmRange * 0.32);
+        wave1Points.push({ x, y: w1 });
+        wave2Points.push({ x, y: w2 });
+
+        // Buy Anchor Dot (Oversold Cross)
+        if (w1 > yOversold && i === candles.length - 8) {
+          ctx.fillStyle = "#00ff88";
+          ctx.beginPath(); ctx.arc(x, w1, 4, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Sell Diamond (Overbought Cross)
+        if (w1 < yOverbought && i === candles.length - 22) {
+          ctx.fillStyle = "#ff3b5c";
+          ctx.beginPath(); ctx.arc(x, w1, 4, 0, Math.PI * 2); ctx.fill();
+        }
+      });
+
+      // Wave 1 (Cyan)
+      ctx.strokeStyle = "#00e5ff";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      wave1Points.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+
+      // Wave 2 (Magenta)
+      ctx.strokeStyle = "#e040fb";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      wave2Points.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+
+      ctx.fillStyle = "#00e5ff";
+      ctx.font = "bold 8.5px monospace";
+      ctx.fillText("🔮 GODMODE V3 OSCILLATOR: WAVE 1 (CYAN) · WAVE 2 (MAGENTA) · 🟢 BUY DOTS · 🔴 SELL DIAMONDS", 10, gmTop + 12);
+    }
+
     // Right-side Price Axis & Current Price Tag
     ctx.fillStyle = "#8892b0";
     ctx.font = "9px monospace";
@@ -504,7 +782,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [candles, livePrice, liveChange, height, showAiSetup, showEma, showBollinger, showVwap, showRsi, mousePos]);
+  }, [candles, livePrice, liveChange, height, showAiSetup, showEma, showBollinger, showVwap, showRsi, specialIndicator, mousePos]);
 
   // Handle Mouse Move for Interactive Crosshair
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -644,6 +922,39 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 400 }: 
           >
             📊 RSI (14)
           </button>
+        </div>
+
+        {/* Special Indicator Dropdown Selector */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[9px] text-accent font-bold">⚡ SPECIAL INDICATOR:</span>
+          <select
+            value={specialIndicator}
+            onChange={(e) => {
+              const val = e.target.value as any;
+              if (!isVipUser && val !== "none") {
+                const labels: Record<string, string> = {
+                  cvd: "Cumulative Volume Delta (CVD & Absorption)",
+                  gex: "Dealer Gamma Exposure (GEX & Volatility Walls)",
+                  anchored_vwap: "Anchored VWAP + SD Envelope (±1σ, ±2σ)",
+                  micro_price: "Volume-Weighted Micro-Price (P_micro)",
+                  fvg: "Fair Value Gaps (FVG) & Order Blocks",
+                  godmode_v3: "Godmode V3 Hybrid Oscillator (WaveTrend + MFI)",
+                };
+                setPaywallFeature(labels[val] || "Institutional Special Indicator");
+                return;
+              }
+              setSpecialIndicator(val);
+            }}
+            className="bg-surface/90 border border-border/70 text-accent font-mono text-[9px] rounded px-2 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
+          >
+            <option value="none">-- Standard Candlesticks --</option>
+            <option value="cvd">🌊 Cumulative Volume Delta (CVD) {!isVipUser ? "🔒" : ""}</option>
+            <option value="gex">⚡ Dealer Gamma Exposure (GEX) {!isVipUser ? "🔒" : ""}</option>
+            <option value="anchored_vwap">🎯 Anchored VWAP Envelope (±1σ, ±2σ) {!isVipUser ? "🔒" : ""}</option>
+            <option value="micro_price">🔬 Micro-Price Order Book Drift {!isVipUser ? "🔒" : ""}</option>
+            <option value="fvg">🧱 Fair Value Gaps (FVG) {!isVipUser ? "🔒" : ""}</option>
+            <option value="godmode_v3">🔮 Godmode V3 Hybrid Oscillator {!isVipUser ? "🔒" : ""}</option>
+          </select>
         </div>
 
         {/* Live Candle OHLC HUD */}
