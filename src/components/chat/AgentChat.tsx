@@ -4,13 +4,15 @@ import { useState, useRef, useEffect } from "react";
 import LiveTradingViewChart from "@/components/charts/LiveTradingViewChart";
 
 const AVAILABLE_MODELS = [
-  { id: "nvidia/nemotron-3.5-lightning:free", name: "NVIDIA Nemotron 3.5 (Free)", badge: "FREE" },
-  { id: "liquid/lfm-2.5-2.6b:free", name: "Liquid LFM 2.6B (Free)", badge: "FREE" },
-  { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B (Fast)", badge: "SMART" },
-  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet (Strategy)", badge: "PRO" },
-  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini (Speed)", badge: "PRO" },
-  { id: "deepseek/deepseek-r1", name: "DeepSeek R1 (Reasoning)", badge: "DEEP" },
-  { id: "0ther5ide-heuristic-v2", name: "0ther5ide Local Neural Core", badge: "LOCAL" },
+  { id: "openrouter/free", name: "OpenRouter Universal Router (Auto-Best)", badge: "AUTO" },
+  { id: "nvidia/nemotron-3.5-lightning:free", name: "NVIDIA Nemotron 3.5 Lightning (Free)", badge: "FREE" },
+  { id: "minimax/minimax-m3:free", name: "MiniMax M3 Reasoning (Free)", badge: "FREE" },
+  { id: "liquid/lfm-2.5-2.6b:free", name: "LiquidAI LFM 2.6B (Free)", badge: "FREE" },
+  { id: "inclusionai/ling-3.0-flash-fin:free", name: "Ling 3.0 Financial Flash (Free)", badge: "FREE" },
+  { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B (Deep Reasoning)", badge: "PRO" },
+  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet (High Strategy)", badge: "PRO" },
+  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini (Tactical Speed)", badge: "PRO" },
+  { id: "deepseek/deepseek-r1", name: "DeepSeek R1 (Deep Mathematical)", badge: "DEEP" },
 ];
 
 const GUIDANCE_CHIPS = [
@@ -38,7 +40,7 @@ export default function AgentChat() {
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("nvidia/nemotron-3.5-lightning:free");
+  const [selectedModel, setSelectedModel] = useState("openrouter/free");
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   const [hiddenCharts, setHiddenCharts] = useState<Record<number, boolean>>({});
   const toggleChart = (idx: number) => setHiddenCharts((prev) => ({ ...prev, [idx]: !prev[idx] }));
