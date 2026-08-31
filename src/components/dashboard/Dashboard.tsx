@@ -102,9 +102,14 @@ export default function Dashboard() {
             <AINotificationBar />
           </div>
 
-          {/* Main Globe */}
-            <div className="h-[420px] md:h-[500px]">
-              <GodModeGlobe signals={signals} height={480} />
+          {/* Top Strategic Command: 3D Globe + Tactical AI Co-Pilot Side-by-Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2 h-[480px] md:h-[520px]">
+                <GodModeGlobe signals={signals} height={500} />
+              </div>
+              <div className="lg:col-span-1 h-[480px] md:h-[520px]">
+                <AgentChat />
+              </div>
             </div>
 
             {/* Autonomous AI Swarm Command Center */}
@@ -118,15 +123,12 @@ export default function Dashboard() {
             </div>
 
             {/* Bottom Row 1: Primary Panels */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="h-[440px]">
                 <IntelFeed />
               </div>
               <div className="h-[440px]">
                 <InsiderPanel />
-              </div>
-              <div className="h-[440px]">
-                <AgentChat />
               </div>
             </div>
 
