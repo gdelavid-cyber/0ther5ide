@@ -118,6 +118,19 @@ export const db = {
     return updated;
   },
 
+  getAllUsers: async (): Promise<UserProfile[]> => {
+    const list = Object.values(memoryStore.users);
+    return list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  },
+
+  deleteUser: async (email: string): Promise<boolean> => {
+    if (memoryStore.users[email]) {
+      delete memoryStore.users[email];
+      return true;
+    }
+    return false;
+  },
+
   getSwarmLogs: async (): Promise<SwarmLog[]> => {
     const remote = await kvGet<SwarmLog[]>("swarm:logs");
     if (remote) return remote;

@@ -14,6 +14,7 @@ import ChartAnalysis from "./ChartAnalysis";
 import OrderFlowPanel from "./OrderFlowPanel";
 import SwarmConsole from "@/components/swarm/SwarmConsole";
 import PricingView from "@/components/pricing/PricingView";
+import AdminConsole from "@/components/admin/AdminConsole";
 import LockedFeatureView from "@/components/pricing/LockedFeatureView";
 import NewsTicker from "./NewsTicker";
 import type { Signal, TensionIndex as TensionType } from "@/lib/types";
@@ -335,6 +336,12 @@ export default function Dashboard() {
         )}
 
 
+
+        {activeTab === "admin" && (
+          <div className="min-h-[700px]">
+            <AdminConsole />
+          </div>
+        )}
 
         {activeTab === "pricing" && (
           <div className="min-h-[700px]">

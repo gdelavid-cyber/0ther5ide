@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { id: "intel", label: "INTEL", icon: "◆", isLocked: true },
   { id: "swarm", label: "SWARM", icon: "🛰️", isLocked: true },
   { id: "pricing", label: "ELITE PASS", icon: "👑", isLocked: false },
+  { id: "admin", label: "ADMIN", icon: "⚙", isLocked: false },
 ];
 
 export default function Navigation({
