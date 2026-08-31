@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { severityColor } from "@/lib/utils";
-import type { Signal, GlobeMarker } from "@/lib/types";
+import type { Signal } from "@/lib/types";
 
 interface Props {
   signals: Signal[];
@@ -27,205 +29,313 @@ const DEFAULT_HOTSPOTS: Signal[] = [
   { id: "def-5", type: "conflict", title: "Eastern Mediterranean Naval Concentration", country: "Cyprus", lat: 34.90, lng: 33.60, severity: 2, source: "AIS / OSINT", url: "https://gdeltproject.org", ts: new Date().toISOString(), tags: [] },
 ];
 
+// Convert Lat/Lng to 3D Cartesian coordinates on sphere radius R
+function latLngToVector3(lat: number, lng: number, radius: number = 100): THREE.Vector3 {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
+  const x = -(radius * Math.sin(phi) * Math.cos(theta));
+  const z = radius * Math.sin(phi) * Math.sin(theta);
+  const y = radius * Math.cos(phi);
+  return new THREE.Vector3(x, y, z);
+}
+
+// Generate an ultra-sharp procedural Earth texture with continents and night lights
+function createProceduralEarthTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 2048;
+  canvas.height = 1024;
+  const ctx = canvas.getContext("2d")!;
+
+  // Deep Space Ocean Base
+  ctx.fillStyle = "#060913";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Subtle longitude & latitude tactical navigation grid
+  ctx.strokeStyle = "rgba(0, 255, 136, 0.08)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < canvas.width; x += 64) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += 64) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  // Draw procedural landmass contours
+  ctx.fillStyle = "#0c1824";
+  ctx.strokeStyle = "#00ff88";
+  ctx.lineWidth = 1.5;
+
+  // Major continental landmass approximations (North America, South America, Eurasia, Africa, Australia)
+  const landmasses = [
+    // North America
+    [[200, 200], [450, 150], [550, 300], [400, 450], [300, 480], [220, 350]],
+    // South America
+    [[400, 520], [520, 560], [480, 800], [420, 900], [380, 700]],
+    // Europe & Africa
+    [[850, 220], [1050, 200], [1150, 320], [1100, 600], [980, 850], [900, 650], [820, 400]],
+    // Asia
+    [[1100, 200], [1600, 180], [1750, 350], [1500, 550], [1300, 500], [1150, 380]],
+    // Australia
+    [[1550, 680], [1750, 700], [1700, 850], [1550, 820]],
+  ];
+
+  landmasses.forEach((poly) => {
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) {
+      ctx.lineTo(poly[i][0], poly[i][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  // Add random city light clusters across land
+  ctx.fillStyle = "rgba(0, 255, 136, 0.7)";
+  for (let i = 0; i < 400; i++) {
+    const rx = Math.random() * canvas.width;
+    const ry = Math.random() * canvas.height;
+    const size = Math.random() * 2 + 1;
+    ctx.beginPath();
+    ctx.arc(rx, ry, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
 export default function GodModeGlobe({ signals, height = 500 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const globeRef = useRef<any>(null);
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [isRotating, setIsRotating] = useState(true);
-
-  const applyGlobeData = useCallback((globeInstance: any, dataSignals: Signal[]) => {
-    if (!globeInstance) return;
-
-    const sourceSignals = dataSignals && dataSignals.length > 0 ? dataSignals : DEFAULT_HOTSPOTS;
-    const validSignals = sourceSignals.filter((s) => s.lat !== 0 && s.lng !== 0);
-
-    const markers = validSignals.slice(0, 250).map((s): GlobeMarker => ({
-      lat: s.lat,
-      lng: s.lng,
-      severity: s.severity,
-      type: s.type,
-      signal: s,
-    }));
-
-    const rings = validSignals
-      .filter((s) => s.severity <= 1)
-      .slice(0, 40)
-      .map((s) => ({
-        lat: s.lat,
-        lng: s.lng,
-        severity: s.severity,
-      }));
-
-    const arcs = [];
-    for (let i = 0; i < COMMAND_HUBS.length; i++) {
-      const hub = COMMAND_HUBS[i];
-      const target = COMMAND_HUBS[(i + 1) % COMMAND_HUBS.length];
-      arcs.push({
-        startLat: hub.lat,
-        startLng: hub.lng,
-        endLat: target.lat,
-        endLng: target.lng,
-        color: ["rgba(0, 255, 136, 0.9)", "rgba(255, 68, 68, 0.9)"],
-        altitude: 0.25,
-        order: i * 0.5,
-      });
-    }
-
-    validSignals.slice(0, 15).forEach((s, idx) => {
-      const nearestHub = COMMAND_HUBS[idx % COMMAND_HUBS.length];
-      arcs.push({
-        startLat: nearestHub.lat,
-        startLng: nearestHub.lng,
-        endLat: s.lat,
-        endLng: s.lng,
-        color: ["#00ff88", severityColor(s.severity)],
-        altitude: 0.18,
-        order: idx * 0.4,
-      });
-    });
-
-    const hubLabels = COMMAND_HUBS.map((h) => ({
-      name: h.name,
-      lat: h.lat,
-      lng: h.lng,
-      isHub: true,
-    }));
-
-    const signalLabels = validSignals
-      .filter((s) => s.severity === 0)
-      .slice(0, 10)
-      .map((s) => ({
-        name: (s.country || "ZONE") + ": " + (s.title || "").slice(0, 22) + "...",
-        lat: s.lat,
-        lng: s.lng,
-        isHub: false,
-      }));
-
-    try {
-      globeInstance
-        .pointsData(markers)
-        .ringsData(rings)
-        .arcsData(arcs)
-        .labelsData([...hubLabels, ...signalLabels]);
-    } catch {}
-  }, []);
+  const controlsRef = useRef<OrbitControls | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || typeof window === "undefined") return;
-    let isMounted = true;
+    const container = containerRef.current;
+    const w = container.clientWidth || 800;
+    const h = height || container.clientHeight || 500;
 
-    import("globe.gl").then((mod) => {
-      if (!isMounted || !containerRef.current) return;
-      const Globe = mod.default || mod;
+    // 1. Scene & Camera Setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#06070a");
 
-      try {
-        const w = containerRef.current.clientWidth || 800;
-        const h = height || containerRef.current.clientHeight || 500;
+    const camera = new THREE.PerspectiveCamera(45, w / h, 1, 2000);
+    camera.position.set(0, 50, 260);
 
-        const globe = Globe()(containerRef.current)
-          .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
-          .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-          .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
-          .backgroundColor("#06070a")
-          .showAtmosphere(true)
-          .atmosphereColor("#00ff88")
-          .atmosphereAltitude(0.24)
-          .width(w)
-          .height(h)
-          // Points configuration
-          .pointColor((d: any) => severityColor(d.severity))
-          .pointAltitude(0.04)
-          .pointRadius((d: any) => (d.severity === 0 ? 1.4 : d.severity === 1 ? 1.0 : 0.6))
-          .pointResolution(16)
-          .onPointClick((d: any) => {
-            if (d.signal) {
-              setSelectedSignal(d.signal);
-              globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.6 }, 1200);
-            }
-          })
-          // Rings configuration (Radar pulses)
-          .ringColor((d: any) => (t: number) => {
-            const col = d.severity === 0 ? "rgba(255,68,68," : d.severity === 1 ? "rgba(255,136,0," : "rgba(0,255,136,";
-            return col + (1 - t) * 0.8 + ")";
-          })
-          .ringMaxRadius(4.5)
-          .ringPropagationSpeed(2.8)
-          .ringRepeatPeriod(900)
-          // Arcs configuration (Kinetic trajectories)
-          .arcColor((d: any) => d.color || ["#00ff88", "#ff4444"])
-          .arcAltitude((d: any) => d.altitude || 0.22)
-          .arcStroke(0.6)
-          .arcDashLength(0.4)
-          .arcDashGap(3.5)
-          .arcDashInitialGap((d: any) => d.order || 0)
-          .arcDashAnimateTime(1600)
-          // Labels configuration
-          .labelText((d: any) => d.name || d.title || "")
-          .labelSize(1.1)
-          .labelColor((d: any) => (d.isHub ? "#00ff88" : "#ffffff"))
-          .labelDotRadius(0.35)
-          .labelResolution(8);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(w, h);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.innerHTML = "";
+    container.appendChild(renderer.domElement);
 
-        // OrbitControls auto-rotation
-        const controls = globe.controls();
-        if (controls) {
-          controls.autoRotate = true;
-          controls.autoRotateSpeed = 0.6;
-          controls.enableDamping = true;
-          controls.dampingFactor = 0.05;
-        }
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.8;
+    controls.minDistance = 140;
+    controls.maxDistance = 450;
+    controlsRef.current = controls;
 
-        // Set initial camera perspective
-        globe.pointOfView({ lat: 20, lng: 15, altitude: 2.3 }, 0);
+    // 2. Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
 
-        // Populate initial data immediately
-        applyGlobeData(globe, signals);
+    const dirLight1 = new THREE.DirectionalLight(0x00ff88, 1.2);
+    dirLight1.position.set(200, 150, 200);
+    scene.add(dirLight1);
 
-        globeRef.current = globe;
+    const dirLight2 = new THREE.DirectionalLight(0x4488ff, 0.9);
+    dirLight2.position.set(-200, -100, -200);
+    scene.add(dirLight2);
 
-        const resizeObserver = new ResizeObserver(() => {
-          if (containerRef.current && globeRef.current) {
-            const currentW = containerRef.current.clientWidth;
-            const currentH = containerRef.current.clientHeight || height;
-            if (currentW > 0 && currentH > 0) {
-              globeRef.current.width(currentW).height(currentH);
-            }
-          }
-        });
+    // 3. Globe Sphere Mesh (Radius = 100)
+    const earthRadius = 100;
+    const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
+    const texture = createProceduralEarthTexture();
+    const earthMaterial = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.7,
+      metalness: 0.2,
+      emissive: new THREE.Color(0x02110c),
+      emissiveIntensity: 0.4,
+    });
+    const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
+    scene.add(earthMesh);
 
-        resizeObserver.observe(containerRef.current);
-      } catch {}
+    // 4. Volumetric Atmosphere Glow Sphere
+    const atmosphereGeometry = new THREE.SphereGeometry(earthRadius * 1.12, 48, 48);
+    const atmosphereMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.BackSide,
+    });
+    const atmosphereMesh = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+    scene.add(atmosphereMesh);
+
+    // 5. Tactical Hotspot Beacons & Expanding Radar Rings
+    const beaconsGroup = new THREE.Group();
+    scene.add(beaconsGroup);
+
+    const sourceSignals = signals && signals.length > 0 ? signals : DEFAULT_HOTSPOTS;
+    const validSignals = sourceSignals.filter((s) => s.lat !== 0 && s.lng !== 0);
+
+    const interactiveObjects: THREE.Object3D[] = [];
+    const animatedRings: { mesh: THREE.Mesh; scale: number; speed: number }[] = [];
+
+    validSignals.forEach((s) => {
+      const pos = latLngToVector3(s.lat, s.lng, earthRadius + 1.5);
+      const colorHex = s.severity === 0 ? 0xff4444 : s.severity === 1 ? 0xff8800 : 0x00ff88;
+
+      // Solid Beacon Cylinder / Pin
+      const pinGeom = new THREE.CylinderGeometry(0.8, 0.2, 8, 8);
+      pinGeom.rotateX(Math.PI / 2);
+      const pinMat = new THREE.MeshBasicMaterial({ color: colorHex });
+      const pinMesh = new THREE.Mesh(pinGeom, pinMat);
+      pinMesh.position.copy(pos);
+      pinMesh.lookAt(new THREE.Vector3(0, 0, 0));
+      (pinMesh as any).signalData = s;
+      beaconsGroup.add(pinMesh);
+      interactiveObjects.push(pinMesh);
+
+      // Glowing Beacon Sphere
+      const sphereGeom = new THREE.SphereGeometry(s.severity === 0 ? 3 : 2, 16, 16);
+      const sphereMat = new THREE.MeshBasicMaterial({ color: colorHex });
+      const sphereMesh = new THREE.Mesh(sphereGeom, sphereMat);
+      sphereMesh.position.copy(pos.clone().multiplyScalar(1.03));
+      (sphereMesh as any).signalData = s;
+      beaconsGroup.add(sphereMesh);
+      interactiveObjects.push(sphereMesh);
+
+      // Pulsing Radar Ring
+      const ringGeom = new THREE.RingGeometry(1.5, 3.5, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide,
+      });
+      const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+      ringMesh.position.copy(pos.clone().multiplyScalar(1.01));
+      ringMesh.lookAt(new THREE.Vector3(0, 0, 0));
+      beaconsGroup.add(ringMesh);
+      animatedRings.push({ mesh: ringMesh, scale: 1, speed: 0.02 + Math.random() * 0.015 });
     });
 
-    return () => {
-      isMounted = false;
-      if (containerRef.current) {
-        containerRef.current.innerHTML = "";
-      }
-      globeRef.current = null;
-    };
-  }, [height, applyGlobeData]);
+    // 6. Kinetic Trajectory Arcs
+    const arcsGroup = new THREE.Group();
+    scene.add(arcsGroup);
 
-  // Update whenever signals changes
-  useEffect(() => {
-    if (globeRef.current) {
-      applyGlobeData(globeRef.current, signals);
+    for (let i = 0; i < COMMAND_HUBS.length; i++) {
+      const h1 = COMMAND_HUBS[i];
+      const h2 = COMMAND_HUBS[(i + 1) % COMMAND_HUBS.length];
+      const p1 = latLngToVector3(h1.lat, h1.lng, earthRadius);
+      const p2 = latLngToVector3(h2.lat, h2.lng, earthRadius);
+
+      const mid = p1.clone().add(p2).multiplyScalar(0.5);
+      const dist = p1.distanceTo(p2);
+      mid.setLength(earthRadius + dist * 0.35);
+
+      const curve = new THREE.QuadraticBezierCurve3(p1, mid, p2);
+      const points = curve.getPoints(40);
+      const arcGeom = new THREE.BufferGeometry().setFromPoints(points);
+      const arcMat = new THREE.LineBasicMaterial({
+        color: i % 2 === 0 ? 0x00ff88 : 0xff4444,
+        transparent: true,
+        opacity: 0.75,
+      });
+      const arcLine = new THREE.Line(arcGeom, arcMat);
+      arcsGroup.add(arcLine);
     }
-  }, [signals, applyGlobeData]);
+
+    // 7. Raycaster for Interactive Click Inspection
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(interactiveObjects, false);
+      if (intersects.length > 0) {
+        const target = intersects[0].object as any;
+        if (target.signalData) {
+          setSelectedSignal(target.signalData);
+        }
+      }
+    };
+
+    renderer.domElement.addEventListener("pointerdown", handlePointerDown);
+
+    // 8. Animation & Render Loop
+    let animationId: number;
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
+
+      // Animate pulsing radar rings
+      animatedRings.forEach((r) => {
+        r.scale += r.speed;
+        r.mesh.scale.set(r.scale, r.scale, r.scale);
+        const mat = r.mesh.material as THREE.MeshBasicMaterial;
+        mat.opacity = Math.max(0, 1 - (r.scale - 1) / 3.5);
+        if (r.scale > 4.5) {
+          r.scale = 1;
+        }
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    // 9. Resize Handling
+    const handleResize = () => {
+      if (!container) return;
+      const newW = container.clientWidth || 800;
+      const newH = height || container.clientHeight || 500;
+      camera.aspect = newW / newH;
+      camera.updateProjectionMatrix();
+      renderer.setSize(newW, newH);
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      resizeObserver.disconnect();
+      renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
+      renderer.dispose();
+      container.innerHTML = "";
+    };
+  }, [signals, height]);
 
   const toggleAutoRotate = () => {
-    if (!globeRef.current) return;
-    const controls = globeRef.current.controls();
-    if (controls) {
-      controls.autoRotate = !isRotating;
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = !isRotating;
       setIsRotating(!isRotating);
     }
   };
 
   const resetView = () => {
-    if (!globeRef.current) return;
-    globeRef.current.pointOfView({ lat: 20, lng: 15, altitude: 2.3 }, 1000);
-    setSelectedSignal(null);
+    if (controlsRef.current) {
+      controlsRef.current.reset();
+      setSelectedSignal(null);
+    }
   };
 
   return (
@@ -240,10 +350,10 @@ export default function GodModeGlobe({ signals, height = 500 }: Props) {
       <div className="absolute top-3 left-3 pointer-events-none z-10 bg-bg/80 backdrop-blur-md px-3 py-2 rounded-lg border border-border/40 text-xs font-mono shadow-lg">
         <div className="flex items-center gap-2 text-accent font-bold">
           <span className="w-2 h-2 rounded-full bg-accent signal-pulse" />
-          <span>ORBITAL 3D PROJECTION · HIGH RESOLUTION</span>
+          <span>ORBITAL 3D PROJECTION · HARDWARE ACCELERATED</span>
         </div>
         <div className="text-[10px] text-muted mt-0.5">
-          Night Lights · Ray-Scattering Atmosphere · Volumetric Beacons
+          WebGL Shaders · Kinetic Trajectory Arcs · Active Sonar Beacons
         </div>
       </div>
 
