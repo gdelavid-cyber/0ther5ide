@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         ? "https://openrouter.ai/api/v1/chat/completions"
         : "https://api.openai.com/v1/chat/completions";
 
-      const model = process.env.OPENROUTER_MODEL || (isOpenRouter ? "meta-llama/llama-3.3-70b-instruct" : "gpt-4o-mini");
+      const model = process.env.OPENROUTER_MODEL || (isOpenRouter ? "nvidia/nemotron-3.5-lightning:free" : "gpt-4o-mini");
 
       const systemPrompt = `You are 0ther5ide — a classified military & financial intelligence analysis terminal. You synthesize multi-sensor GEOINT, SIGINT, and FININT feeds.
 
