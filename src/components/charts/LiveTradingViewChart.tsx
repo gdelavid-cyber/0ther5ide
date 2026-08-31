@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface Candle {
   time: string;
@@ -16,73 +16,53 @@ interface Props {
   height?: number;
 }
 
-const BASE_PRICES: Record<string, number> = {
-  NVDA: 128.5,
-  BTC: 64250.0,
-  TSLA: 214.2,
-  SPY: 546.8,
-  ETH: 3480.0,
-  SOL: 154.2,
-  AAPL: 224.5,
-  GOLD: 2518.5,
-  XAU: 2518.5,
-  XAUUSD: 2518.5,
-};
-
-function generateCandles(ticker: string, count: number = 42): Candle[] {
-  const base = BASE_PRICES[ticker.toUpperCase()] || 150.0;
-  const volatility = base > 1000 ? 120 : base > 100 ? 1.4 : 0.8;
-  const candles: Candle[] = [];
-  let current = base * 0.94;
-  const now = Date.now();
-
-  for (let i = count; i >= 0; i--) {
-    const t = new Date(now - i * 15 * 60 * 1000);
-    const timeStr = t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const change = (Math.random() - 0.48) * volatility * 2.2;
-    const open = current;
-    const close = +(open + change).toFixed(2);
-    const high = +(Math.max(open, close) + Math.random() * volatility * 1.5).toFixed(2);
-    const low = +(Math.min(open, close) - Math.random() * volatility * 1.5).toFixed(2);
-    const volume = Math.floor(Math.random() * 85000 + 15000);
-
-    candles.push({ time: timeStr, open, high, low, close, volume });
-    current = close;
-  }
-  return candles;
-}
+const TICKER_BUTTONS = [
+  { id: "NVDA", label: "NVDA" },
+  { id: "BTC", label: "BTC" },
+  { id: "XAUUSD", label: "XAU/USD" },
+  { id: "TSLA", label: "TSLA" },
+  { id: "SPY", label: "SPY" },
+  { id: "ETH", label: "ETH" },
+  { id: "SOL", label: "SOL" },
+];
 
 export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: Props) {
-  const [activeSymbol, setActiveSymbol] = useState(symbol.toUpperCase().replace(/[^A-Z]/g, "") || "NVDA");
+  const [activeSymbol, setActiveSymbol] = useState(
+    symbol.toUpperCase().replace(/[^A-Z]/g, "") || "NVDA"
+  );
   const [timeframe, setTimeframe] = useState("15M");
   const [showAiSetup, setShowAiSetup] = useState(true);
-  const [candles, setCandles] = useState<Candle[]>(() => generateCandles(activeSymbol));
+  const [candles, setCandles] = useState<Candle[]>([]);
+  const [livePrice, setLivePrice] = useState<number>(0);
+  const [liveChange, setLiveChange] = useState<number>(0);
+  const [dataSource, setDataSource] = useState<string>("Coinbase / Finnhub Real-Time");
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Fetch 100% Real Live Market Data
+  const fetchLiveCandles = useCallback(async (sym: string) => {
+    try {
+      const res = await fetch(`/api/market/live?symbol=${sym}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.candles && data.candles.length > 0) {
+        setCandles(data.candles);
+        setLivePrice(data.price);
+        setLiveChange(data.change24h);
+        if (data.source) setDataSource(data.source);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
-    setActiveSymbol(symbol.toUpperCase().replace(/[^A-Z]/g, "") || "NVDA");
+    const clean = symbol.toUpperCase().replace(/[^A-Z]/g, "") || "NVDA";
+    setActiveSymbol(clean === "GOLD" || clean === "XAU" ? "XAUUSD" : clean);
   }, [symbol]);
 
   useEffect(() => {
-    setCandles(generateCandles(activeSymbol));
-  }, [activeSymbol, timeframe]);
-
-  // Live real-time tick simulator
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCandles((prev) => {
-        if (prev.length === 0) return prev;
-        const last = { ...prev[prev.length - 1] };
-        const tick = (Math.random() - 0.49) * (last.close > 1000 ? 15 : 0.4);
-        last.close = +(last.close + tick).toFixed(2);
-        last.high = Math.max(last.high, last.close);
-        last.low = Math.min(last.low, last.close);
-        last.volume += Math.floor(Math.random() * 500);
-        return [...prev.slice(0, -1), last];
-      });
-    }, 1500);
+    fetchLiveCandles(activeSymbol);
+    const interval = setInterval(() => fetchLiveCandles(activeSymbol), 4000);
     return () => clearInterval(interval);
-  }, [activeSymbol]);
+  }, [activeSymbol, fetchLiveCandles]);
 
   // Render HTML5 Canvas Candlestick Engine with Visual S/R Target Overlay
   useEffect(() => {
@@ -120,7 +100,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
     // Min/Max bounds
     const rawMin = Math.min(...candles.map((c) => c.low));
     const rawMax = Math.max(...candles.map((c) => c.high));
-    const currentPrice = candles[candles.length - 1]?.close || rawMax;
+    const currentPrice = livePrice || candles[candles.length - 1]?.close || rawMax;
 
     // AI S/R Target Levels
     const entryPrice = +(currentPrice * 0.992).toFixed(2);
@@ -199,7 +179,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
         ctx.fillStyle = color;
         ctx.font = "bold 9px monospace";
         ctx.textAlign = "left";
-        ctx.fillText(`${label}: $${price}`, 10, y - 4);
+        ctx.fillText(`${label}: $${price.toLocaleString()}`, 10, y - 4);
       };
 
       drawTargetLine(tp2Price, "🎯 TP2 (+8.5%)", "#ffd700");
@@ -216,19 +196,22 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
     for (let i = 0; i <= steps; i++) {
       const p = minPrice + (priceRange / steps) * (steps - i);
       const y = (priceAreaHeight / steps) * i + 15;
-      ctx.fillText(p.toFixed(p > 1000 ? 1 : 2), width - 4, y - 2);
+      ctx.fillText(p.toLocaleString(undefined, { minimumFractionDigits: p > 1000 ? 1 : 2, maximumFractionDigits: 2 }), width - 4, y - 2);
     }
-  }, [candles, showAiSetup]);
+  }, [candles, livePrice, showAiSetup]);
 
   const latest = candles[candles.length - 1] || { close: 150, open: 150, high: 150, low: 150, volume: 50000 };
-  const first = candles[0] || latest;
-  const changePct = (((latest.close - first.open) / first.open) * 100).toFixed(2);
-  const isPositive = +changePct >= 0;
+  const currentPrice = livePrice || latest.close;
+  const isPositive = liveChange >= 0;
 
-  const currentPrice = latest.close;
   const entryPrice = +(currentPrice * 0.992).toFixed(2);
   const stopLossPrice = +(currentPrice * 0.972).toFixed(2);
   const tp1Price = +(currentPrice * 1.048).toFixed(2);
+
+  const displayTicker =
+    activeSymbol === "XAUUSD" || activeSymbol === "GOLD" || activeSymbol === "XAU"
+      ? "XAU/USD (Spot Gold)"
+      : activeSymbol;
 
   return (
     <div className="w-full rounded-xl border border-accent/40 overflow-hidden bg-[#06070a] flex flex-col shadow-[0_0_30px_rgba(0,255,136,0.15)] my-2 font-mono">
@@ -236,11 +219,11 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
       <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-surface/90 border-b border-border/50 text-[10px] gap-2">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-accent signal-pulse" />
-          <span className="text-accent font-bold tracking-wider">AI CONFLUENCE TERMINAL</span>
+          <span className="text-accent font-bold tracking-wider">LIVE MARKET FEED</span>
           <span className="text-muted">·</span>
-          <span className="text-fg font-bold bg-bg px-2 py-0.5 rounded border border-border/60">{activeSymbol === "XAUUSD" || activeSymbol === "GOLD" ? "XAU/USD (Gold)" : activeSymbol}</span>
+          <span className="text-fg font-bold bg-bg px-2 py-0.5 rounded border border-border/60">{displayTicker}</span>
           <span className={`font-bold ${isPositive ? "text-accent" : "text-red-400"}`}>
-            ${latest.close.toLocaleString()} ({isPositive ? "+" : ""}{changePct}%)
+            ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({isPositive ? "+" : ""}{liveChange}%)
           </span>
         </div>
 
@@ -275,27 +258,24 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
 
           {/* Quick Tickers */}
           <div className="flex items-center gap-1">
-            {[
-              { id: "NVDA", label: "NVDA" },
-              { id: "BTC", label: "BTC" },
-              { id: "XAUUSD", label: "XAU/USD" },
-              { id: "TSLA", label: "TSLA" },
-              { id: "SPY", label: "SPY" },
-              { id: "ETH", label: "ETH" },
-              { id: "SOL", label: "SOL" },
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActiveSymbol(t.id)}
-                className={`px-2 py-0.5 rounded transition font-bold ${
-                  activeSymbol === t.id || (t.id === "XAUUSD" && (activeSymbol === "GOLD" || activeSymbol === "XAU"))
-                    ? "bg-accent text-bg shadow-md"
-                    : "bg-surface border border-border/40 text-muted hover:text-accent"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+            {TICKER_BUTTONS.map((t) => {
+              const isSelected =
+                activeSymbol === t.id ||
+                (t.id === "XAUUSD" && (activeSymbol === "GOLD" || activeSymbol === "XAU"));
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveSymbol(t.id)}
+                  className={`px-2 py-0.5 rounded transition font-bold ${
+                    isSelected
+                      ? "bg-accent text-bg shadow-md"
+                      : "bg-surface border border-border/40 text-muted hover:text-accent"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -304,17 +284,16 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 320 }: 
       {showAiSetup && (
         <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-accent/5 text-[9px] border-b border-accent/20">
           <div className="flex items-center gap-3">
-            <span className="text-green-400 font-bold">🟢 ENTRY: ${entryPrice}</span>
-            <span className="text-red-400 font-bold">🛑 STOP: ${stopLossPrice}</span>
-            <span className="text-yellow-300 font-bold">🎯 TP1: ${tp1Price}</span>
+            <span className="text-green-400 font-bold">🟢 ENTRY: ${entryPrice.toLocaleString()}</span>
+            <span className="text-red-400 font-bold">🛑 STOP: ${stopLossPrice.toLocaleString()}</span>
+            <span className="text-yellow-300 font-bold">🎯 TP1: ${tp1Price.toLocaleString()}</span>
             <span className="px-1.5 py-0.2 rounded bg-accent/20 text-accent border border-accent/40 font-bold">
               R:R 1 : 3.4
             </span>
           </div>
           <div className="flex items-center gap-2 text-muted">
-            <span>RSI: <strong className="text-green-400">58.4</strong></span>
-            <span>MACD: <strong className="text-cyan-400">BULLISH CROSS</strong></span>
-            <span>GEX: <strong className="text-yellow-300">+2.4M (SUPPRESSION)</strong></span>
+            <span>FEED: <strong className="text-accent">{dataSource}</strong></span>
+            <span>LIVE TICK: <span className="text-accent animate-ping">●</span></span>
           </div>
         </div>
       )}
