@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     }
 
     const lastMessage = (messages[messages.length - 1]?.content || '').toUpperCase();
+    const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       const isMarket = lastMessage.match(/NVDA|AAPL|TSLA|BTC|ETH|SOL|AMZN|MSFT|MARKET|STOCK|CRYPTO/i);
