@@ -53,12 +53,12 @@ export default function GodModeGlobe({ signals, height = 540 }: Props) {
     const w = container.clientWidth || 800;
     const h = height || container.clientHeight || 540;
 
-    // 1. Scene & Camera Setup
+    // 1. Photorealistic WebGL Scene & Camera
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#04060a");
+    scene.background = new THREE.Color("#020306");
 
-    const camera = new THREE.PerspectiveCamera(45, w / h, 1, 4000);
-    camera.position.set(0, 30, 240);
+    const camera = new THREE.PerspectiveCamera(42, w / h, 1, 4000);
+    camera.position.set(0, 35, 250);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -68,7 +68,7 @@ export default function GodModeGlobe({ signals, height = 540 }: Props) {
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.35;
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
     renderer.domElement.style.display = "block";
@@ -77,106 +77,171 @@ export default function GodModeGlobe({ signals, height = 540 }: Props) {
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    controls.dampingFactor = 0.04;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.6;
-    controls.minDistance = 125;
-    controls.maxDistance = 450;
+    controls.autoRotateSpeed = 0.55;
+    controls.minDistance = 120;
+    controls.maxDistance = 480;
     controlsRef.current = controls;
 
-    // 2. Clean Natural Deep Space Lighting (No Green Cast)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
+    // 2. Cinematic Solar & Space Lighting
+    const ambientLight = new THREE.AmbientLight(0x0a1424, 0.85);
     scene.add(ambientLight);
 
-    const mainSun = new THREE.DirectionalLight(0xffffff, 2.0);
-    mainSun.position.set(300, 200, 300);
-    scene.add(mainSun);
+    const sunLight = new THREE.DirectionalLight(0xfffdfa, 3.2);
+    sunLight.position.set(380, 160, 260);
+    scene.add(sunLight);
 
-    const softFill = new THREE.DirectionalLight(0x6699cc, 0.8);
-    softFill.position.set(-300, -100, -200);
-    scene.add(softFill);
+    const earthShine = new THREE.DirectionalLight(0x1a3a60, 0.9);
+    earthShine.position.set(-350, -80, -220);
+    scene.add(earthShine);
 
-    // 3. Deep Space Starfield
+    // 3. Deep Space Celestial Starfield (3,200 Stars with Spectral Variation)
     const starGeom = new THREE.BufferGeometry();
-    const starCount = 1400;
+    const starCount = 3200;
     const starPos = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+
     for (let i = 0; i < starCount * 3; i += 3) {
-      starPos[i] = (Math.random() - 0.5) * 2200;
-      starPos[i + 1] = (Math.random() - 0.5) * 2200;
-      starPos[i + 2] = (Math.random() - 0.5) * 2200;
+      starPos[i] = (Math.random() - 0.5) * 2600;
+      starPos[i + 1] = (Math.random() - 0.5) * 2600;
+      starPos[i + 2] = (Math.random() - 0.5) * 2600;
+
+      // Color variation: blue, white, warm amber
+      const r = Math.random();
+      if (r > 0.8) {
+        starColors[i] = 0.7; starColors[i + 1] = 0.85; starColors[i + 2] = 1.0; // Cool Blue
+      } else if (r > 0.6) {
+        starColors[i] = 1.0; starColors[i + 1] = 0.9; starColors[i + 2] = 0.7; // Warm Gold
+      } else {
+        starColors[i] = 0.95; starColors[i + 1] = 0.95; starColors[i + 2] = 1.0; // Pure White
+      }
     }
     starGeom.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
-    const starMat = new THREE.PointsMaterial({ color: 0xaaccff, size: 1.6, transparent: true, opacity: 0.75 });
+    starGeom.setAttribute("color", new THREE.BufferAttribute(starColors, 3));
+    const starMat = new THREE.PointsMaterial({
+      size: 1.4,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+    });
     scene.add(new THREE.Points(starGeom, starMat));
 
-    // 4. Photorealistic NASA Earth Core Sphere (Pure, Clean, No Outer Shell)
+    // 4. Photorealistic NASA Earth Core Sphere
     const earthRadius = 100;
-    const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
+    const earthGeometry = new THREE.SphereGeometry(earthRadius, 96, 96);
     const earthMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0e1726,
-      roughness: 0.45,
-      metalness: 0.1,
-      emissive: new THREE.Color(0x000000),
-      emissiveIntensity: 0.0,
+      color: 0xffffff,
+      roughness: 0.35,
+      metalness: 0.15,
+      emissive: new THREE.Color(0x181810),
+      emissiveIntensity: 0.45,
     });
     const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
     scene.add(earthMesh);
 
-    // Load High-Res NASA Earth Night Lights Map
+    // Texture Loader with Multi-Mirror Fallbacks for Maximum Realism
     const textureLoader = new THREE.TextureLoader();
-    const textureUrls = [
-      "https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-night.jpg",
+
+    // High-Resolution NASA Blue Marble / Night Lights
+    textureLoader.load(
       "https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-blue-marble.jpg",
-      "//unpkg.com/three-globe/example/img/earth-night.jpg"
-    ];
-
-    const loadTextureWithFallback = (index: number) => {
-      if (index >= textureUrls.length) return;
-      textureLoader.load(
-        textureUrls[index],
-        (tex) => {
-          tex.wrapS = THREE.RepeatWrapping;
-          tex.wrapT = THREE.ClampToEdgeWrapping;
-          earthMaterial.map = tex;
-          earthMaterial.color.setHex(0xffffff);
-          earthMaterial.emissive.setHex(0x111111);
-          earthMaterial.emissiveIntensity = 0.2;
+      (dayTex) => {
+        dayTex.wrapS = THREE.RepeatWrapping;
+        dayTex.wrapT = THREE.ClampToEdgeWrapping;
+        earthMaterial.map = dayTex;
+        earthMaterial.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        textureLoader.load("https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-night.jpg", (nightTex) => {
+          earthMaterial.map = nightTex;
           earthMaterial.needsUpdate = true;
-        },
-        undefined,
-        () => loadTextureWithFallback(index + 1)
-      );
-    };
-    loadTextureWithFallback(0);
+        });
+      }
+    );
 
-    // 5. 4D Orbital Satellites
+    // Topographic Bump Map for 3D Mountain Elevation Relief
+    textureLoader.load(
+      "https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-topology.png",
+      (bumpTex) => {
+        earthMaterial.bumpMap = bumpTex;
+        earthMaterial.bumpScale = 1.2;
+        earthMaterial.needsUpdate = true;
+      }
+    );
+
+    // 5. Volumetric Dynamic Rotating Cloud Layer (Hovering at 100.7x Altitude)
+    const cloudGeometry = new THREE.SphereGeometry(earthRadius * 1.007, 64, 64);
+    const cloudMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.NormalBlending,
+      roughness: 0.9,
+    });
+    const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
+    scene.add(cloudMesh);
+
+    textureLoader.load(
+      "https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-water.png",
+      (cloudTex) => {
+        cloudMaterial.alphaMap = cloudTex;
+        cloudMaterial.needsUpdate = true;
+      }
+    );
+
+    // 6. Realistic Thin Rayleigh Atmosphere Glow (Delicate 100km Blue Horizon Limb)
+    const atmoGeometry = new THREE.SphereGeometry(earthRadius * 1.018, 64, 64);
+    const atmoMaterial = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.8);
+          gl_FragColor = vec4(0.0, 0.65, 1.0, 1.0) * intensity * 0.45;
+        }
+      `,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      transparent: true,
+    });
+    const atmoMesh = new THREE.Mesh(atmoGeometry, atmoMaterial);
+    scene.add(atmoMesh);
+
+    // 7. 4D Defense Satellites with Orbital Paths
     const satelliteGroup = new THREE.Group();
     scene.add(satelliteGroup);
 
     const satellites: { mesh: THREE.Mesh; orbitRadius: number; speed: number; angle: number }[] = [];
     const orbitConfigs = [
-      { r: 120, speed: 0.012, tilt: 0.3, color: 0x00ffaa },
-      { r: 135, speed: -0.009, tilt: 0.7, color: 0x00e5ff },
-      { r: 150, speed: 0.007, tilt: -0.4, color: 0xffaa00 },
+      { r: 122, speed: 0.010, tilt: 0.35, color: 0x00ffcc },
+      { r: 138, speed: -0.008, tilt: 0.65, color: 0x00d9ff },
+      { r: 154, speed: 0.006, tilt: -0.45, color: 0xffb700 },
     ];
 
     orbitConfigs.forEach((cfg) => {
-      // Clean thin orbital track
       const orbitRingGeom = new THREE.BufferGeometry();
       const ringPoints: THREE.Vector3[] = [];
-      const segs = 64;
+      const segs = 96;
       for (let i = 0; i <= segs; i++) {
         const theta = (i / segs) * Math.PI * 2;
         ringPoints.push(new THREE.Vector3(Math.cos(theta) * cfg.r, 0, Math.sin(theta) * cfg.r));
       }
       orbitRingGeom.setFromPoints(ringPoints);
-      const ringLineMat = new THREE.LineBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.15 });
+      const ringLineMat = new THREE.LineBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.18 });
       const ringMesh = new THREE.Line(orbitRingGeom, ringLineMat);
       ringMesh.rotation.x = cfg.tilt;
       satelliteGroup.add(ringMesh);
 
-      // Satellite Dot
-      const satGeom = new THREE.SphereGeometry(1.5, 8, 8);
+      // Satellite Module Mesh
+      const satGeom = new THREE.SphereGeometry(1.4, 8, 8);
       const satMat = new THREE.MeshBasicMaterial({ color: cfg.color });
       const satMesh = new THREE.Mesh(satGeom, satMat);
       satelliteGroup.add(satMesh);
@@ -188,7 +253,7 @@ export default function GodModeGlobe({ signals, height = 540 }: Props) {
       });
     });
 
-    // 6. Kinetic Hotspots & Radar Rings
+    // 8. Kinetic Conflict Beacons & Radar Rings
     const beaconsGroup = new THREE.Group();
     scene.add(beaconsGroup);
 
@@ -198,85 +263,88 @@ export default function GodModeGlobe({ signals, height = 540 }: Props) {
     const interactiveObjects: THREE.Object3D[] = [];
     const animatedRings: { mesh: THREE.Mesh; scale: number; speed: number }[] = [];
 
-    validSignals.forEach((s) => {
-      const pos = latLngToVector3(s.lat, s.lng, earthRadius);
-      const colorHex = s.severity === 0 ? 0xff2244 : s.severity === 1 ? 0xff8800 : 0x00ff88;
+    validSignals.forEach((sig) => {
+      const pos = latLngToVector3(sig.lat, sig.lng, earthRadius + 0.8);
+      const colorHex = new THREE.Color(severityColor(sig.severity)).getHex();
 
-      // Vertical Laser Pillar
-      const pillarGeom = new THREE.CylinderGeometry(0.35, 0.08, 12, 8);
-      pillarGeom.rotateX(Math.PI / 2);
-      const pillarMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.95 });
-      const pillarMesh = new THREE.Mesh(pillarGeom, pillarMat);
-      pillarMesh.position.copy(pos.clone().multiplyScalar(1.04));
-      pillarMesh.lookAt(new THREE.Vector3(0, 0, 0));
-      (pillarMesh as any).signalData = s;
-      beaconsGroup.add(pillarMesh);
-      interactiveObjects.push(pillarMesh);
+      // Pin Core
+      const pinGeom = new THREE.SphereGeometry(1.6, 12, 12);
+      const pinMat = new THREE.MeshBasicMaterial({ color: colorHex });
+      const pinMesh = new THREE.Mesh(pinGeom, pinMat);
+      pinMesh.position.copy(pos);
+      pinMesh.userData = { signal: sig };
+      beaconsGroup.add(pinMesh);
+      interactiveObjects.push(pinMesh);
 
-      // Glowing Beacon Orb
-      const orbGeom = new THREE.SphereGeometry(s.severity === 0 ? 3.0 : 2.0, 16, 16);
-      const orbMat = new THREE.MeshBasicMaterial({ color: colorHex });
-      const orbMesh = new THREE.Mesh(orbGeom, orbMat);
-      orbMesh.position.copy(pos.clone().multiplyScalar(1.07));
-      (orbMesh as any).signalData = s;
-      beaconsGroup.add(orbMesh);
-      interactiveObjects.push(orbMesh);
-
-      // Concentric Expanding Radar Wave
-      const ringGeom = new THREE.RingGeometry(1.2, 3.4, 32);
+      // Radar Pulse Ring
+      const ringGeom = new THREE.RingGeometry(1.8, 2.6, 24);
       const ringMat = new THREE.MeshBasicMaterial({
         color: colorHex,
-        transparent: true,
-        opacity: 0.85,
         side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8,
       });
       const ringMesh = new THREE.Mesh(ringGeom, ringMat);
-      ringMesh.position.copy(pos.clone().multiplyScalar(1.01));
-      ringMesh.lookAt(new THREE.Vector3(0, 0, 0));
+      ringMesh.position.copy(pos);
+      ringMesh.lookAt(0, 0, 0);
       beaconsGroup.add(ringMesh);
-      animatedRings.push({ mesh: ringMesh, scale: 1, speed: 0.022 + Math.random() * 0.015 });
+
+      animatedRings.push({
+        mesh: ringMesh,
+        scale: 1,
+        speed: 0.015 + Math.random() * 0.01,
+      });
     });
 
-    // 7. Trajectory Arcs with Niagara Energy Photons
-    const arcsGroup = new THREE.Group();
-    scene.add(arcsGroup);
+    // 9. Niagara-Style Command Trajectory Arcs & Photon Particles
+    const arcGroup = new THREE.Group();
+    scene.add(arcGroup);
 
-    const particleStreams: { curve: THREE.QuadraticBezierCurve3; particle: THREE.Mesh; progress: number; speed: number }[] = [];
+    const activeArcs = [
+      { from: COMMAND_HUBS[0], to: COMMAND_HUBS[1], color: 0x00ffcc }, // Pentagon -> London
+      { from: COMMAND_HUBS[1], to: COMMAND_HUBS[2], color: 0x00d9ff }, // London -> Kyiv
+      { from: COMMAND_HUBS[0], to: COMMAND_HUBS[3], color: 0xffaa00 }, // Pentagon -> Tel Aviv
+      { from: COMMAND_HUBS[3], to: COMMAND_HUBS[5], color: 0xff3b5c }, // Tel Aviv -> Bab-el-Mandeb
+      { from: COMMAND_HUBS[0], to: COMMAND_HUBS[6], color: 0x00ffcc }, // Pentagon -> Taipei
+    ];
 
-    for (let i = 0; i < COMMAND_HUBS.length; i++) {
-      const h1 = COMMAND_HUBS[i];
-      const h2 = COMMAND_HUBS[(i + 1) % COMMAND_HUBS.length];
-      const p1 = latLngToVector3(h1.lat, h1.lng, earthRadius);
-      const p2 = latLngToVector3(h2.lat, h2.lng, earthRadius);
+    const photonParticles: { mesh: THREE.Mesh; curve: THREE.QuadraticBezierCurve3; progress: number; speed: number }[] = [];
 
-      const mid = p1.clone().add(p2).multiplyScalar(0.5);
-      const dist = p1.distanceTo(p2);
-      mid.setLength(earthRadius + dist * 0.35);
+    activeArcs.forEach((arcDef) => {
+      const vFrom = latLngToVector3(arcDef.from.lat, arcDef.from.lng, earthRadius + 0.8);
+      const vTo = latLngToVector3(arcDef.to.lat, arcDef.to.lng, earthRadius + 0.8);
 
-      const curve = new THREE.QuadraticBezierCurve3(p1, mid, p2);
-      const points = curve.getPoints(50);
+      const mid = vFrom.clone().add(vTo).multiplyScalar(0.5);
+      const dist = vFrom.distanceTo(vTo);
+      mid.normalize().multiplyScalar(earthRadius + dist * 0.32);
+
+      const curve = new THREE.QuadraticBezierCurve3(vFrom, mid, vTo);
+      const points = curve.getPoints(48);
+
       const arcGeom = new THREE.BufferGeometry().setFromPoints(points);
       const arcMat = new THREE.LineBasicMaterial({
-        color: i % 2 === 0 ? 0x00ffaa : 0xff3355,
+        color: arcDef.color,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.35,
       });
-      arcsGroup.add(new THREE.Line(arcGeom, arcMat));
+      const arcLine = new THREE.Line(arcGeom, arcMat);
+      arcGroup.add(arcLine);
 
-      // Moving Photon Energy Particle
-      const photonGeom = new THREE.SphereGeometry(1.3, 8, 8);
-      const photonMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      // Moving Photon Pulse
+      const photonGeom = new THREE.SphereGeometry(1.2, 8, 8);
+      const photonMat = new THREE.MeshBasicMaterial({ color: arcDef.color });
       const photonMesh = new THREE.Mesh(photonGeom, photonMat);
-      arcsGroup.add(photonMesh);
-      particleStreams.push({
-        curve,
-        particle: photonMesh,
-        progress: Math.random(),
-        speed: 0.004 + Math.random() * 0.003,
-      });
-    }
+      arcGroup.add(photonMesh);
 
-    // 8. Raycaster for Interactive Hotspot Selection
+      photonParticles.push({
+        mesh: photonMesh,
+        curve,
+        progress: Math.random(),
+        speed: 0.006 + Math.random() * 0.004,
+      });
+    });
+
+    // 10. Raycaster for Interactive Hotspot Clicks
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -286,175 +354,148 @@ export default function GodModeGlobe({ signals, height = 540 }: Props) {
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(interactiveObjects, false);
+      const intersects = raycaster.intersectObjects(interactiveObjects);
+
       if (intersects.length > 0) {
-        const target = intersects[0].object as any;
-        if (target.signalData) {
-          setSelectedSignal(target.signalData);
+        const target = intersects[0].object;
+        if (target.userData?.signal) {
+          setSelectedSignal(target.userData.signal);
         }
       }
     };
 
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
 
-    // 9. 60 FPS Render Loop
-    let animationId: number;
+    // 11. 60 FPS Render Loop with Cloud & Satellite Physics
+    let animId: number;
     const animate = () => {
-      animationId = requestAnimationFrame(animate);
+      animId = requestAnimationFrame(animate);
 
-      // Satellite Orbits
-      satellites.forEach((sat) => {
+      // Subtle Cloud Layer Independent Drift
+      cloudMesh.rotation.y += 0.0006;
+
+      // Orbit controls
+      controls.update();
+
+      // Satellite orbital movement
+      satellites.forEach((sat, i) => {
         sat.angle += sat.speed;
-        sat.mesh.position.set(
-          Math.cos(sat.angle) * sat.orbitRadius,
-          Math.sin(sat.angle * 1.5) * 15,
-          Math.sin(sat.angle) * sat.orbitRadius
-        );
+        const cfg = orbitConfigs[i];
+        const rawX = Math.cos(sat.angle) * sat.orbitRadius;
+        const rawZ = Math.sin(sat.angle) * sat.orbitRadius;
+
+        // Apply tilt
+        const tiltedY = -rawZ * Math.sin(cfg.tilt);
+        const tiltedZ = rawZ * Math.cos(cfg.tilt);
+
+        sat.mesh.position.set(rawX, tiltedY, tiltedZ);
       });
 
-      // Niagara Photons Moving on Arcs
-      particleStreams.forEach((ps) => {
-        ps.progress += ps.speed;
-        if (ps.progress > 1) ps.progress = 0;
-        const pt = ps.curve.getPoint(ps.progress);
-        ps.particle.position.copy(pt);
-      });
-
-      // Pulsing Sonar Waves
+      // Animated Radar Rings
       animatedRings.forEach((r) => {
         r.scale += r.speed;
-        r.mesh.scale.set(r.scale, r.scale, r.scale);
-        const mat = r.mesh.material as THREE.MeshBasicMaterial;
-        mat.opacity = Math.max(0, 1 - (r.scale - 1) / 3.4);
-        if (r.scale > 4.4) {
+        if (r.scale > 3.2) {
           r.scale = 1;
         }
+        r.mesh.scale.set(r.scale, r.scale, 1);
+        (r.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - (r.scale - 1) / 2.2);
       });
 
-      controls.update();
+      // Moving Photons along Beziers
+      photonParticles.forEach((p) => {
+        p.progress += p.speed;
+        if (p.progress > 1) p.progress = 0;
+        const pos = p.curve.getPoint(p.progress);
+        p.mesh.position.copy(pos);
+      });
+
       renderer.render(scene, camera);
     };
-
     animate();
 
-    // 10. Auto-Resize
+    // 12. Responsive Resize
     const handleResize = () => {
-      if (!container) return;
-      const newW = container.clientWidth || 800;
-      const newH = height || container.clientHeight || 540;
+      if (!containerRef.current) return;
+      const newW = containerRef.current.clientWidth;
+      const newH = height || containerRef.current.clientHeight || 540;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
     };
-
-    const resizeObserver = new ResizeObserver(handleResize);
-    resizeObserver.observe(container);
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      cancelAnimationFrame(animationId);
-      resizeObserver.disconnect();
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", handleResize);
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       renderer.dispose();
-      container.innerHTML = "";
+      controls.dispose();
     };
   }, [signals, height]);
 
-  const toggleAutoRotate = () => {
+  const toggleRotation = () => {
     if (controlsRef.current) {
-      controlsRef.current.autoRotate = !isRotating;
-      setIsRotating(!isRotating);
-    }
-  };
-
-  const resetView = () => {
-    if (controlsRef.current) {
-      controlsRef.current.reset();
-      setSelectedSignal(null);
+      controlsRef.current.autoRotate = !controlsRef.current.autoRotate;
+      setIsRotating(controlsRef.current.autoRotate);
     }
   };
 
   return (
-    <div className="w-full h-full relative rounded-xl border border-border/50 overflow-hidden glow-border bg-[#04060a] min-h-[480px] flex flex-col">
-      <div
-        ref={containerRef}
-        className="globe-canvas-wrapper w-full h-full min-h-[480px] flex-1 cursor-grab active:cursor-grabbing"
-        style={{ height: `${height}px`, width: "100%", display: "block" }}
-      />
-
-      {/* Top Left HUD Telemetry Overlay */}
-      <div className="absolute top-3 left-3 pointer-events-none z-10 bg-bg/85 backdrop-blur-md px-3.5 py-2.5 rounded-lg border border-accent/40 text-xs font-mono shadow-2xl">
-        <div className="flex items-center gap-2 text-accent font-bold">
-          <span className="w-2.5 h-2.5 rounded-full bg-accent signal-pulse" />
-          <span>ORBITAL 3D PROJECTION · CLEAN OPTICAL VIEW</span>
+    <div className="relative w-full rounded-2xl border border-accent/40 overflow-hidden bg-[#020306] shadow-[0_0_50px_rgba(0,255,136,0.1)] flex flex-col h-full font-mono">
+      {/* HUD Top Overlay */}
+      <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2 pointer-events-auto">
+        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface/90 border border-border/60 backdrop-blur-md text-xs">
+          <span className="w-2 h-2 rounded-full bg-accent signal-pulse" />
+          <span className="text-accent font-bold tracking-wider">NASA BLUE MARBLE 4D</span>
+          <span className="text-[10px] text-muted hidden sm:inline">· 60 FPS PBR</span>
         </div>
-        <div className="text-[10px] text-muted mt-1 flex items-center gap-3">
-          <span>NASA Night Lights</span>
-          <span>·</span>
-          <span>Orbital Satellites</span>
-          <span>·</span>
-          <span className="text-accent font-bold">DEFCON 2</span>
-        </div>
-      </div>
 
-      {/* Top Right Globe Camera Controls */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
         <button
-          onClick={toggleAutoRotate}
-          className={"px-2.5 py-1 text-[10px] font-mono rounded border backdrop-blur-md transition " + (
-            isRotating
-              ? "bg-accent/20 border-accent/50 text-accent font-bold"
-              : "bg-surface/80 border-border/50 text-muted hover:text-fg"
-          )}
+          onClick={toggleRotation}
+          className="px-2.5 py-1 rounded-full bg-surface/90 border border-border/60 hover:border-accent/60 text-[10px] text-muted hover:text-accent backdrop-blur-md transition flex items-center gap-1.5"
         >
-          {isRotating ? "ROTATION ON" : "ROTATION PAUSED"}
-        </button>
-        <button
-          onClick={resetView}
-          className="px-2.5 py-1 text-[10px] font-mono rounded border border-border/50 bg-surface/80 text-fg hover:border-accent/40 transition backdrop-blur-md"
-        >
-          RESET CAMERA
+          <span>{isRotating ? "⏸ PAUSE ROTATION" : "▶ RESUME ROTATION"}</span>
         </button>
       </div>
 
-      {/* Bottom Floating Signal Inspector when Clicked */}
+      {/* HUD Bottom Legend */}
+      <div className="absolute bottom-3 left-3 z-10 hidden md:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-surface/80 border border-border/40 backdrop-blur-md text-[10px] text-muted">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-red-500" />
+          <span>KINETIC CONFLICT</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-yellow-400" />
+          <span>GEOINT THERMAL</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+          <span>4D DEFENSE SATELLITE</span>
+        </div>
+      </div>
+
+      {/* 3D WebGL Canvas Mount */}
+      <div ref={containerRef} className="w-full flex-1 min-h-[460px] cursor-grab active:cursor-grabbing" />
+
+      {/* Active Selected Signal Modal / Popup */}
       {selectedSignal && (
-        <div className="absolute bottom-3 left-3 right-3 z-10 bg-bg/95 backdrop-blur-xl p-3.5 rounded-xl border border-accent/50 shadow-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <span
-              className={"w-3.5 h-3.5 rounded-full " + (
-                selectedSignal.severity === 0 ? "bg-red-500 signal-pulse" : selectedSignal.severity === 1 ? "bg-orange-500 signal-pulse" : "bg-yellow-500"
-              )}
-            />
-            <div>
-              <div className="text-xs font-bold text-fg flex items-center gap-2">
-                <span>{selectedSignal.country}</span>
-                <span className="text-muted font-normal">·</span>
-                <span className="text-accent font-mono">{selectedSignal.source}</span>
-                <span className="text-[9px] text-muted font-mono">
-                  [{selectedSignal.lat.toFixed(2)}, {selectedSignal.lng.toFixed(2)}]
-                </span>
-              </div>
-              <div className="text-[11px] text-muted/90 mt-0.5">{selectedSignal.title}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {selectedSignal.url && (
-              <a
-                href={selectedSignal.url}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3 py-1.5 bg-accent text-bg text-[10px] font-bold rounded hover:bg-accent/90 transition shadow-lg"
-              >
-                TACTICAL INTEL STREAM
-              </a>
-            )}
+        <div className="absolute bottom-4 right-4 z-20 max-w-sm w-[90vw] p-3.5 rounded-xl bg-bg/95 border-2 border-accent shadow-2xl backdrop-blur-xl animate-fade-in text-xs">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/40">
+            <span className="px-2 py-0.5 rounded bg-accent/20 text-accent font-bold text-[10px] uppercase">
+              {selectedSignal.type} // {selectedSignal.country}
+            </span>
             <button
               onClick={() => setSelectedSignal(null)}
-              className="text-muted hover:text-fg text-xs px-2 py-1"
+              className="text-muted hover:text-red-400 font-bold px-1"
             >
               ✕
             </button>
+          </div>
+          <h4 className="font-bold text-fg text-sm leading-snug mb-1">{selectedSignal.title}</h4>
+          <div className="text-[10px] text-muted space-y-0.5 mt-2 font-mono">
+            <div>COORDINATES: {selectedSignal.lat.toFixed(2)}°N, {selectedSignal.lng.toFixed(2)}°E</div>
+            <div>SOURCE: {selectedSignal.source}</div>
+            <div>TIMESTAMP: {new Date(selectedSignal.ts).toUTCString()}</div>
           </div>
         </div>
       )}
