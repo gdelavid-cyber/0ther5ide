@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import TradeExecutionModal from "@/components/trading/TradeExecutionModal";
 import PaywallModal from "@/components/pricing/PaywallModal";
+import RealTradingViewEmbed from "./RealTradingViewEmbed";
 
 interface Candle {
   time: string;
@@ -77,6 +78,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   const [showOrderBookDOM, setShowOrderBookDOM] = useState<boolean>(true);
   const [mounted, setMounted] = useState<boolean>(false);
   const [floatingZIndex, setFloatingZIndex] = useState<number>(999999);
+  const [chartEngine, setChartEngine] = useState<"0ther5ide" | "tradingview">("0ther5ide");
 
   const bringToFront = () => {
     setFloatingZIndex(Date.now() % 1000000 + 999999);
@@ -912,6 +914,32 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
           ))}
         </div>
 
+        {/* Dual Chart Engine Switcher: 0ther5ide L3 vs Official TradingView */}
+        <div className="flex items-center bg-bg/90 p-0.5 rounded border border-accent/60 shadow-inner">
+          <button
+            onClick={() => setChartEngine("0ther5ide")}
+            className={`px-2 py-0.5 rounded text-[9px] font-extrabold transition flex items-center gap-1 ${
+              chartEngine === "0ther5ide"
+                ? "bg-accent text-bg shadow-sm"
+                : "text-muted hover:text-fg"
+            }`}
+            title="Switch to 0ther5ide High-Frequency L3 Canvas Engine with Webull Level 2 DOM"
+          >
+            <span>⚡ 0ther5ide L3</span>
+          </button>
+          <button
+            onClick={() => setChartEngine("tradingview")}
+            className={`px-2 py-0.5 rounded text-[9px] font-extrabold transition flex items-center gap-1 ${
+              chartEngine === "tradingview"
+                ? "bg-sky-400 text-bg shadow-sm"
+                : "text-muted hover:text-sky-300"
+            }`}
+            title="Switch to Official TradingView Advanced Real-Time Technical Analysis Engine"
+          >
+            <span>📈 TRADINGVIEW</span>
+          </button>
+        </div>
+
         {/* Window Controls & Zoom */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Order Book DOM Toggle */}
@@ -1078,29 +1106,35 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
       {/* Main Canvas & Side Order Book Split Body */}
       <div className="flex-1 flex w-full relative min-h-[380px] bg-[#06090e]">
-        {/* Candlestick Canvas Area */}
-        <div className="flex-1 relative h-full">
-          <canvas
-            ref={canvasRef}
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseMove={(e) => {
-              if (isDragging) {
-                const diff = e.clientX - dragStartX;
-                if (Math.abs(diff) > 8) {
-                  setPanOffset((p) => Math.max(0, p + (diff > 0 ? 1 : -1)));
-                  setDragStartX(e.clientX);
+        {/* Candlestick Chart Area (Dual Engine: Real TradingView Embed OR Custom 0ther5ide L3 Canvas) */}
+        {chartEngine === "tradingview" ? (
+          <div className="flex-1 relative h-full min-h-[380px] bg-[#06090e] flex flex-col">
+            <RealTradingViewEmbed symbol={activeSymbol} timeframe={timeframe} height="100%" />
+          </div>
+        ) : (
+          <div className="flex-1 relative h-full">
+            <canvas
+              ref={canvasRef}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              onMouseMove={(e) => {
+                if (isDragging) {
+                  const diff = e.clientX - dragStartX;
+                  if (Math.abs(diff) > 8) {
+                    setPanOffset((p) => Math.max(0, p + (diff > 0 ? 1 : -1)));
+                    setDragStartX(e.clientX);
+                  }
                 }
-              }
-              handleMouseMove(e);
-            }}
-            onMouseLeave={handleCanvasLeave}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            className="w-full h-full cursor-crosshair block select-none"
-          />
-        </div>
+                handleMouseMove(e);
+              }}
+              onMouseLeave={handleCanvasLeave}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              className="w-full h-full cursor-crosshair block select-none"
+            />
+          </div>
+        )}
 
         {/* Webull Level 2 Order Book Depth Ladder (DOM) */}
         {showOrderBookDOM && (
