@@ -1,0 +1,1 @@
+export { default as GodModeGlobe } from './GodModeGlobe';
