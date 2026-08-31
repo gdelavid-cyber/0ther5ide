@@ -2,8 +2,8 @@ import { cookies } from "next/headers";
 import { logger } from "@/lib/logger";
 import { db, UserProfile } from "@/lib/db/store";
 
-const SESSION_COOKIE_NAME = "godmode_session";
-const JWT_SECRET = process.env.JWT_SECRET || "godmode_super_secret_session_key_2026";
+const SESSION_COOKIE_NAME = "0ther5ide_session";
+const JWT_SECRET = process.env.JWT_SECRET || "0ther5ide_super_secret_session_key_2026";
 
 // Simple HMAC-SHA256 Token Signature using Web Crypto API
 async function signToken(payload: object): Promise<string> {

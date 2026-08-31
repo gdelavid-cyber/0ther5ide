@@ -26,9 +26,9 @@ export interface DatabaseSchema {
 // In-memory memory store instance
 const memoryStore: DatabaseSchema = {
   users: {
-    "operator@godmode.intel": {
+    "operator@0ther5ide.intel": {
       id: "usr_default_admin",
-      email: "operator@godmode.intel",
+      email: "operator@0ther5ide.intel",
       name: "Operator Alpha",
       avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
       planTier: "vip",

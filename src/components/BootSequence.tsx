@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 const LINES = [
-  { text: 'INITIALIZING GODMODE ENGINE v2.1.0', delay: 0 },
+  { text: 'INITIALIZING 0ther5ide ENGINE v2.1.0', delay: 0 },
   { text: 'CONNECTING 5 OSINT SOURCES...', delay: 200 },
   { text: '⊡ OPENSKY · FIRMS · KIWISDR · MARITIME', delay: 350 },
   { text: '⊡ FRED · BLS · EIA · TREASURY · GSCPI', delay: 450 },
@@ -40,7 +40,7 @@ export default function BootSequence() {
           </div>
           <div className="absolute inset-0 rounded-full border border-accent/20 animate-ping" />
         </div>
-        <h1 className="text-2xl font-bold accent-text tracking-wider">GODMODE</h1>
+        <h1 className="text-2xl font-bold accent-text tracking-wider">0ther5ide</h1>
         <p className="text-[10px] text-muted mt-1 tracking-widest">INTELLIGENCE TERMINAL</p>
       </div>
 

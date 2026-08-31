@@ -22,7 +22,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: "operator@godmode.intel",
+          email: "operator@0ther5ide.intel",
           name: "Operator Alpha",
           avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
         }),
@@ -35,7 +35,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: Props) {
       const data = await res.json();
       onSuccess(data.user || {
         name: "Operator Alpha",
-        email: "operator@godmode.intel",
+        email: "operator@0ther5ide.intel",
         avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
         planTier: "vip",
       });
@@ -60,7 +60,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: Props) {
           ✕
         </button>
 
-        <div className="text-xs font-bold text-accent tracking-widest mb-1">GODMODE v2.1.0</div>
+        <div className="text-xs font-bold text-accent tracking-widest mb-1">0ther5ide v2.1.0</div>
         <h3 className="text-lg font-bold text-white mb-1 font-sans">Sign In to Terminal</h3>
         <p className="text-xs text-muted mb-5 font-sans leading-relaxed">
           Access classified intelligence feeds, unlock full executive dossiers, and run the Tactical AI Agent.

@@ -62,7 +62,7 @@ export function checkRateLimit(domain: string, maxRequests: number, windowSecond
 
 // SEC EDGAR Compliant User-Agent
 export const SEC_HEADERS = {
-  "User-Agent": process.env.SEC_USER_AGENT || "GodModeIntelligenceTerminal/2.1 (ops@godmode.intel)",
+  "User-Agent": process.env.SEC_USER_AGENT || "0ther5ideIntelligenceTerminal/2.1 (ops@0ther5ide.intel)",
   "Accept-Encoding": "gzip, deflate",
   "Host": "www.sec.gov",
 };

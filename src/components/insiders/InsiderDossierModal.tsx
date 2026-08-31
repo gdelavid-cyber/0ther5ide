@@ -188,7 +188,7 @@ export default function InsiderDossierModal({ dossier, onClose, onOpenAuth }: Pr
 
         {/* Footer */}
         <div className="px-5 py-3 bg-surface/30 border-t border-border/30 flex items-center justify-between text-[10px] text-muted font-mono">
-          <span>GODMODE SURVEILLANCE ENGINE v2.1.0</span>
+          <span>0ther5ide SURVEILLANCE ENGINE v2.1.0</span>
           <button onClick={onClose} className="px-3 py-1 bg-surface hover:bg-border/60 text-fg rounded transition">
             CLOSE DOSSIER [ESC]
           </button>

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const token = await createSessionToken({ email: user.email, name: user.name });
 
     const response = NextResponse.json({ success: true, user });
-    response.cookies.set("godmode_session", token, {
+    response.cookies.set("0ther5ide_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   const response = NextResponse.json({ success: true });
-  response.cookies.set("godmode_session", "", {
+  response.cookies.set("0ther5ide_session", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

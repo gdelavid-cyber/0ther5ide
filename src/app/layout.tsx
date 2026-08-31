@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'GODMODE — Intelligence Terminal',
+  title: '0ther5ide — Intelligence Terminal',
   description: 'Global intelligence terminal — live conflict data, market signals, insider activity.',
   manifest: '/manifest.json',
 };

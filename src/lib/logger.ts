@@ -1,4 +1,4 @@
-// Structured Production Logger for GODMODE Intelligence Terminal
+// Structured Production Logger for 0ther5ide Intelligence Terminal
 type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
 
 interface LogContext {

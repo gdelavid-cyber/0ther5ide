@@ -146,7 +146,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="text-[10px] text-muted pt-3 mt-3 border-t border-border/30 flex items-center justify-between font-mono">
-                  <span>GODMODE ENGINE v2.1.0</span>
+                  <span>0ther5ide ENGINE v2.1.0</span>
                   <span className="text-accent">ENCRYPTED STREAM ACTIVE</span>
                 </div>
               </div>

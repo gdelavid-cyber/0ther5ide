@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
    • Target 1: Previous swing liquidity pool.
    • Target 2: Macro continuation boundary (+14.2%).`;
       } else if (isGeopolitical) {
-        reply = `GODMODE TACTICAL ASSESSMENT — THEATER OF OPERATIONS
+        reply = `0ther5ide TACTICAL ASSESSMENT — THEATER OF OPERATIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. VERDICT: ELEVATED / HIGH CONFLICT RISK
    Active telemetry confirms multi-domain sensor convergence. Thermal anomaly density elevated in border logistics corridors.
@@ -67,12 +67,12 @@ export async function POST(req: NextRequest) {
 
       return Response.json({
         reply,
-        reasoning: 'GODMODE neural engine tactical heuristic synthesis.',
+        reasoning: '0ther5ide neural engine tactical heuristic synthesis.',
         usage: { promptTokens: 42, completionTokens: 180 },
       });
     }
 
-    const prompt = `You are GODMODE — a classified intelligence analysis agent. You analyze geopolitical and market data.
+    const prompt = `You are 0ther5ide — a classified intelligence analysis agent. You analyze geopolitical and market data.
 
 Current analysis context: ${analysis || 'none'}
 

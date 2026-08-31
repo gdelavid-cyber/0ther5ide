@@ -4,7 +4,7 @@ import { db } from "@/lib/db/store";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const email = body.email || "operator@godmode.intel";
+    const email = body.email || "operator@0ther5ide.intel";
     const planTier = body.tier || "vip";
 
     const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
             price_data: {
               currency: "usd",
               product_data: {
-                name: "GODMODE VIP INSIDER ACCESS",
+                name: "0ther5ide VIP INSIDER ACCESS",
                 description: "Unlimited SEC Form 4 Dossier Decryptions, Institutional Order Flow & Tactical Agent",
               },
               unit_amount: 2500, // $25.00

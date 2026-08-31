@@ -53,9 +53,9 @@ export default function Navigation({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleTabClick("all")}>
               <div className="w-6 h-6 rounded bg-accent/20 border border-accent/30 flex items-center justify-center">
-                <span className="text-accent text-xs font-bold">GM</span>
+                <span className="text-accent text-xs font-bold">05</span>
               </div>
-              <span className="text-accent font-bold text-sm tracking-wider">GODMODE</span>
+              <span className="text-accent font-bold text-sm tracking-wider">0ther5ide</span>
               <span className="text-[9px] text-muted bg-surface px-1.5 py-0.5 rounded border border-border/50">v2.1.0</span>
             </div>
             <div className="hidden md:flex items-center gap-1 ml-4">
