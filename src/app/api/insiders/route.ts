@@ -22,9 +22,7 @@ export async function GET() {
     }));
 
     trades.sort((a, b) => {
-      if (a.action === "buy" && b.action !== "buy") return -1;
-      if (a.action !== "buy" && b.action === "buy") return 1;
-      return b.value - a.value;
+      return new Date(b.filedAt).getTime() - new Date(a.filedAt).getTime();
     });
 
     return Response.json({
