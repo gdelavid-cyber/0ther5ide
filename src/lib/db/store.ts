@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
-import type { SwarmLog, InsiderTrade } from "@/lib/types";
+import type { InsiderTrade } from "@/lib/types";
+import type { SwarmLog } from "@/lib/swarm/types";
 
 export interface UserProfile {
   id: string;
