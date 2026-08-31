@@ -82,6 +82,9 @@ export default function FloatingAssistant() {
     } catch {}
   };
 
+  const [zIndex, setZIndex] = useState(99999);
+  const bringToFront = () => setZIndex(Date.now() % 1000000 + 999999);
+
   // Determine inline styles for draggable positioning
   const style: React.CSSProperties = position
     ? {
@@ -90,19 +93,20 @@ export default function FloatingAssistant() {
         top: `${position.y}px`,
         bottom: "auto",
         right: "auto",
-        zIndex: 9999,
+        zIndex: zIndex,
       }
     : {
         position: "fixed",
         bottom: "75px", // Default 75px on mobile to clear bottom dock
         right: "16px",
-        zIndex: 9999,
+        zIndex: zIndex,
       };
 
   return (
     <div
       ref={floatingRef}
       style={style}
+      onClick={bringToFront}
       className="font-mono touch-none select-none"
     >
       {/* Expanded Floating Assistant Modal */}

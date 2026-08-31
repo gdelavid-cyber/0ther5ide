@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import TradeExecutionModal from "@/components/trading/TradeExecutionModal";
 import PaywallModal from "@/components/pricing/PaywallModal";
 
@@ -74,6 +75,12 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   const [isFullscreenWindow, setIsFullscreenWindow] = useState<boolean>(false);
   const [floatingPos, setFloatingPos] = useState<{ x: number; y: number } | null>(null);
   const [showOrderBookDOM, setShowOrderBookDOM] = useState<boolean>(true);
+  const [mounted, setMounted] = useState<boolean>(false);
+  const [floatingZIndex, setFloatingZIndex] = useState<number>(999999);
+
+  const bringToFront = () => {
+    setFloatingZIndex(Date.now() % 1000000 + 999999);
+  };
 
   const isWindowDraggingRef = useRef<boolean>(false);
   const windowDragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
@@ -83,6 +90,10 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     startY: 0,
   });
   const floatingWindowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Indicator Toggles
   const [showAiSetup, setShowAiSetup] = useState(false);
@@ -827,12 +838,12 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
 
   const floatingStyle: React.CSSProperties = isFloating
     ? isFullscreenWindow
-      ? { position: "fixed", inset: 0, zIndex: 99999, width: "100vw", height: "100vh" }
+      ? { position: "fixed", inset: 0, zIndex: floatingZIndex, width: "100vw", height: "100vh" }
       : {
           position: "fixed",
           left: floatingPos ? `${floatingPos.x}px` : "calc(50vw - 460px)",
           top: floatingPos ? `${floatingPos.y}px` : "70px",
-          zIndex: 99999,
+          zIndex: floatingZIndex,
           width: showOrderBookDOM ? "960px" : "760px",
           minWidth: "340px",
           minHeight: "380px",
@@ -844,10 +855,11 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         }
     : {};
 
-  return (
+  const chartElement = (
     <div
-      ref={isFloating ? floatingWindowRef : containerRef}
+      ref={isFloating ? floatingWindowRef : undefined}
       style={floatingStyle}
+      onClick={isFloating ? bringToFront : undefined}
       className={`${
         isFloating
           ? "bg-[#06090e]/98 backdrop-blur-2xl border-2 border-accent/70 rounded-2xl flex flex-col overflow-hidden font-mono shadow-2xl animate-fade-in"
@@ -1157,6 +1169,49 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
           onClose={() => setShowExecutionModal(false)}
         />
       )}
+    </div>
+  );
+
+  if (isFloating && mounted) {
+    return (
+      <>
+        {/* Clean Docked Placeholder Card */}
+        <div
+          ref={containerRef}
+          className="w-full rounded-2xl border-2 border-dashed border-accent/40 bg-[#06090e]/60 p-6 flex flex-col items-center justify-center text-center my-2 font-mono space-y-3 min-h-[380px] shadow-[0_0_30px_rgba(0,255,136,0.08)]"
+        >
+          <div className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-accent" />
+          </div>
+          <div className="text-accent font-extrabold text-sm tracking-wider">
+            ⚡ {displayTicker} PRO TERMINAL FLOATING ACTIVE
+          </div>
+          <div className="text-[11px] text-muted max-w-sm leading-relaxed">
+            The chart terminal is detached into an unrestricted floating window with priority layering over everything.
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => {
+                setIsFloating(false);
+                setIsFullscreenWindow(false);
+              }}
+              className="px-3.5 py-1.5 rounded-lg bg-accent text-bg font-extrabold text-xs hover:brightness-110 transition shadow-md flex items-center gap-1.5"
+            >
+              <span>⟲ DOCK CHART BACK HERE</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Floating Portal directly on Document Body */}
+        {createPortal(chartElement, document.body)}
+      </>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="w-full flex flex-col">
+      {chartElement}
     </div>
   );
 }
