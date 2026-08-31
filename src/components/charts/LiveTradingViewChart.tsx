@@ -70,7 +70,19 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   const [liveChange, setLiveChange] = useState<number>(2.4);
   const [dataSource, setDataSource] = useState<string>("Kraken & NASDAQ Real-Time");
   const [canvasDimensions, setCanvasDimensions] = useState<{ width: number; height: number }>({ width: 720, height: 440 });
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isFloating, setIsFloating] = useState<boolean>(false);
+  const [isFullscreenWindow, setIsFullscreenWindow] = useState<boolean>(false);
+  const [floatingPos, setFloatingPos] = useState<{ x: number; y: number } | null>(null);
+  const [showOrderBookDOM, setShowOrderBookDOM] = useState<boolean>(true);
+
+  const isWindowDraggingRef = useRef<boolean>(false);
+  const windowDragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
+    mouseX: 0,
+    mouseY: 0,
+    startX: 0,
+    startY: 0,
+  });
+  const floatingWindowRef = useRef<HTMLDivElement>(null);
 
   // Indicator Toggles
   const [showAiSetup, setShowAiSetup] = useState(false);
@@ -119,21 +131,57 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     } catch {}
   }, []);
 
+  // Floating Window Drag Handlers
+  const handleWindowPointerDown = (e: React.PointerEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("select") || target.closest("canvas")) return;
+    if (!floatingWindowRef.current) return;
+    const rect = floatingWindowRef.current.getBoundingClientRect();
+    isWindowDraggingRef.current = true;
+    windowDragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startX: floatingPos ? floatingPos.x : rect.left,
+      startY: floatingPos ? floatingPos.y : rect.top,
+    };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const handleWindowPointerMove = (e: React.PointerEvent) => {
+    if (!isWindowDraggingRef.current) return;
+    const deltaX = e.clientX - windowDragStartRef.current.mouseX;
+    const deltaY = e.clientY - windowDragStartRef.current.mouseY;
+    const newX = Math.max(10, Math.min(window.innerWidth - 300, windowDragStartRef.current.startX + deltaX));
+    const newY = Math.max(10, Math.min(window.innerHeight - 200, windowDragStartRef.current.startY + deltaY));
+    setFloatingPos({ x: newX, y: newY });
+  };
+
+  const handleWindowPointerUp = () => {
+    isWindowDraggingRef.current = false;
+  };
+
   // ResizeObserver for dynamic, responsive container adaptation
   useEffect(() => {
     const updateSize = () => {
-      if (isExpanded) {
-        setCanvasDimensions({
-          width: window.innerWidth - 48,
-          height: window.innerHeight - 150,
-        });
+      if (isFloating) {
+        if (isFullscreenWindow) {
+          setCanvasDimensions({
+            width: window.innerWidth - (showOrderBookDOM ? 240 : 40),
+            height: window.innerHeight - 140,
+          });
+        } else {
+          setCanvasDimensions({
+            width: Math.min(window.innerWidth - 60, showOrderBookDOM ? 780 : 620),
+            height: 500,
+          });
+        }
         return;
       }
       if (containerRef.current) {
         const w = containerRef.current.clientWidth;
         if (w > 0) {
           setCanvasDimensions({
-            width: Math.floor(w),
+            width: Math.floor(w - (showOrderBookDOM ? 190 : 0)),
             height: height || 440,
           });
         }
@@ -143,7 +191,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     updateSize();
     window.addEventListener("resize", updateSize);
 
-    if (containerRef.current && !isExpanded) {
+    if (containerRef.current && !isFloating) {
       const observer = new ResizeObserver(updateSize);
       observer.observe(containerRef.current);
       return () => {
@@ -153,7 +201,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     }
 
     return () => window.removeEventListener("resize", updateSize);
-  }, [height, isExpanded]);
+  }, [height, isFloating, isFullscreenWindow, showOrderBookDOM]);
 
   // Fetch Live Real Data from API
   const fetchLiveCandles = useCallback(async (sym: string) => {
@@ -722,25 +770,66 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
   const latest = visibleCandles[visibleCandles.length - 1] || { close: 150, open: 150, high: 150, low: 150, volume: 50000 };
   const currentPrice = livePrice || latest.close;
   const isPositive = liveChange >= 0;
-  const activeCandle = hoveredCandle || latest;
-
   const displayTicker =
     activeSymbol === "XAUUSD" || activeSymbol === "GOLD" || activeSymbol === "XAU"
       ? "XAU/USD (Spot Gold)"
       : activeSymbol;
+  const activeCandle = hoveredCandle || latest;
+
+  // Webull Style Order Book DOM Ladder Data
+  const orderBookDOM = useMemo(() => {
+    const bids = Array.from({ length: 6 }, (_, i) => ({
+      price: +(currentPrice - (i + 1) * (currentPrice * 0.0008)).toFixed(2),
+      size: Math.round(Math.random() * 4500 + 1200),
+    }));
+    const asks = Array.from({ length: 6 }, (_, i) => ({
+      price: +(currentPrice + (i + 1) * (currentPrice * 0.0008)).toFixed(2),
+      size: Math.round(Math.random() * 4200 + 1100),
+    }));
+    const totalBids = bids.reduce((s, b) => s + b.size, 0);
+    const totalAsks = asks.reduce((s, a) => s + a.size, 0);
+    const bidPct = Math.round((totalBids / (totalBids + totalAsks || 1)) * 100);
+    return { bids, asks, bidPct, askPct: 100 - bidPct };
+  }, [currentPrice]);
+
+  const floatingStyle: React.CSSProperties = isFloating
+    ? isFullscreenWindow
+      ? { position: "fixed", inset: 0, zIndex: 99999, width: "100vw", height: "100vh" }
+      : {
+          position: "fixed",
+          left: floatingPos ? `${floatingPos.x}px` : "calc(50vw - 460px)",
+          top: floatingPos ? `${floatingPos.y}px` : "70px",
+          zIndex: 99999,
+          width: showOrderBookDOM ? "940px" : "740px",
+          maxWidth: "96vw",
+          boxShadow: "0 25px 80px -15px rgba(0, 0, 0, 0.95), 0 0 40px rgba(0, 255, 136, 0.25)",
+        }
+    : {};
 
   return (
-    <div ref={containerRef} className={isExpanded ? "fixed inset-0 z-50 bg-[#04060a]/98 backdrop-blur-2xl p-4 flex flex-col w-screen h-screen overflow-hidden font-mono animate-fade-in" : "w-full rounded-2xl border border-accent/40 overflow-hidden bg-[#04060a] flex flex-col shadow-[0_0_40px_rgba(0,255,136,0.15)] my-2 font-mono"}>
-      {/* Top Tactical Chart Bar */}
-      <div className="flex flex-wrap items-center justify-between px-3.5 py-2.5 bg-surface/90 border-b border-border/50 text-[10px] gap-2">
+    <div
+      ref={isFloating ? floatingWindowRef : containerRef}
+      style={floatingStyle}
+      className={`${
+        isFloating
+          ? "bg-[#06090e]/98 backdrop-blur-2xl border-2 border-accent/70 rounded-2xl flex flex-col overflow-hidden font-mono shadow-2xl animate-fade-in"
+          : "w-full rounded-2xl border border-accent/40 overflow-hidden bg-[#06090e] flex flex-col shadow-[0_0_40px_rgba(0,255,136,0.15)] my-2 font-mono"
+      }`}
+    >
+      {/* Webull Pro Title / Drag Handle Bar */}
+      <div
+        onPointerDown={isFloating && !isFullscreenWindow ? handleWindowPointerDown : undefined}
+        onPointerMove={isFloating && !isFullscreenWindow ? handleWindowPointerMove : undefined}
+        onPointerUp={isFloating && !isFullscreenWindow ? handleWindowPointerUp : undefined}
+        className={`flex flex-wrap items-center justify-between px-3.5 py-2.5 bg-[#0a0f18] border-b border-border/60 text-[10px] gap-2 ${
+          isFloating && !isFullscreenWindow ? "cursor-move select-none" : ""
+        }`}
+      >
         <div className="flex items-center gap-2 flex-wrap">
+          {isFloating && <span className="text-muted text-xs cursor-grab">⠿</span>}
           <span className="w-2.5 h-2.5 rounded-full bg-accent signal-pulse" />
-          <span className="text-accent font-bold tracking-wider">
-            {activeSymbol === "BTC" || activeSymbol === "ETH" || activeSymbol === "SOL"
-              ? "KRAKEN L3 SPOT FEED"
-              : activeSymbol === "XAUUSD" || activeSymbol === "GOLD"
-              ? "LBMA/COMEX SPOT GOLD FEED"
-              : "NASDAQ / NYSE CONSOLIDATED FEED"}
+          <span className="text-accent font-extrabold tracking-wider">
+            {isFloating ? "⚡ 0ther5ide PRO FLOATING TERMINAL" : "NASDAQ · NYSE · KRAKEN L3 FEED"}
           </span>
           <span className="text-muted">·</span>
           <span className="text-fg font-bold bg-bg px-2 py-0.5 rounded border border-border/60">{displayTicker}</span>
@@ -749,59 +838,85 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
           </span>
         </div>
 
-        {/* Zoom & Pan Controls */}
-        <div className="flex items-center gap-1 bg-surface/80 px-2 py-0.5 rounded border border-border/50">
-          <span className="text-[9px] text-muted font-mono font-bold">ZOOM: {Math.round(zoomLevel * 100)}%</span>
-          <button
-            onClick={handleZoomIn}
-            className="w-5 h-5 flex items-center justify-center rounded bg-surface hover:bg-border/60 text-fg text-xs font-bold border border-border/40 transition"
-            title="Zoom In (Scroll Up)"
-          >
-            +
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="w-5 h-5 flex items-center justify-center rounded bg-surface hover:bg-border/60 text-fg text-xs font-bold border border-border/40 transition"
-            title="Zoom Out (Scroll Down)"
-          >
-            -
-          </button>
-          <button
-            onClick={handleResetZoom}
-            className="px-1.5 h-5 flex items-center justify-center rounded bg-surface hover:bg-border/60 text-muted hover:text-accent text-[9px] font-mono border border-border/40 transition"
-            title="Reset Zoom"
-          >
-            ⟲ 100%
-          </button>
+        {/* Timeframe Selector */}
+        <div className="flex items-center gap-0.5 bg-bg/90 p-0.5 rounded border border-border/50">
+          {["1M", "5M", "15M", "1H", "4H", "1D"].map((tf) => (
+            <button
+              key={tf}
+              onClick={() => setTimeframe(tf)}
+              className={`px-2 py-0.5 rounded text-[9px] font-bold transition ${
+                timeframe === tf ? "bg-accent text-bg shadow-sm font-extrabold" : "text-muted hover:text-fg"
+              }`}
+            >
+              {tf}
+            </button>
+          ))}
         </div>
 
-        {/* Pop-Out & Fullscreen Expand Button */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className={"px-2.5 py-1 rounded transition font-bold border flex items-center gap-1.5 " + (
-            isExpanded
-              ? "bg-red-500/20 border-red-500/50 text-red-300 hover:bg-red-500/30"
-              : "bg-surface hover:bg-border/60 border-border/60 text-fg hover:text-accent"
-          )}
-          title={isExpanded ? "Exit Fullscreen" : "Pop Out & Expand Chart"}
-        >
-          <span>{isExpanded ? "✕ EXIT EXPAND" : "⛶ POP OUT"}</span>
-        </button>
+        {/* Window Controls & Zoom */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Order Book DOM Toggle */}
+          <button
+            onClick={() => setShowOrderBookDOM(!showOrderBookDOM)}
+            className={`px-2 py-0.5 rounded text-[9px] font-bold border transition ${
+              showOrderBookDOM ? "bg-accent/20 border-accent text-accent" : "border-border/40 text-muted"
+            }`}
+            title="Toggle Level 2 Order Book Depth Ladder"
+          >
+            DOM {showOrderBookDOM ? "ON" : "OFF"}
+          </button>
 
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1 bg-surface/80 px-1.5 py-0.5 rounded border border-border/50">
+            <span className="text-[8.5px] text-muted font-mono">{Math.round(zoomLevel * 100)}%</span>
+            <button onClick={handleZoomIn} className="w-4 h-4 flex items-center justify-center rounded bg-surface text-fg text-xs font-bold hover:bg-border/60">+</button>
+            <button onClick={handleZoomOut} className="w-4 h-4 flex items-center justify-center rounded bg-surface text-fg text-xs font-bold hover:bg-border/60">-</button>
+            <button onClick={handleResetZoom} className="px-1 h-4 flex items-center justify-center rounded bg-surface text-muted text-[8px] hover:text-accent">⟲</button>
+          </div>
+
+          {/* Pop-Out / Float Button */}
+          <button
+            onClick={() => {
+              if (isFloating) {
+                setIsFloating(false);
+                setIsFullscreenWindow(false);
+              } else {
+                setIsFloating(true);
+              }
+            }}
+            className={`px-2.5 py-1 rounded transition font-bold border flex items-center gap-1 text-[9.5px] ${
+              isFloating
+                ? "bg-red-500/20 border-red-500/50 text-red-300 hover:bg-red-500/30"
+                : "bg-gradient-to-r from-accent/20 to-emerald-400/20 border-accent/60 text-accent hover:brightness-110 shadow-sm"
+            }`}
+            title={isFloating ? "Dock Back into Page" : "Pop Out Floating Terminal"}
+          >
+            <span>{isFloating ? "⟲ DOCK" : "⛶ POP OUT (FLOAT)"}</span>
+          </button>
+
+          {isFloating && (
+            <button
+              onClick={() => setIsFullscreenWindow(!isFullscreenWindow)}
+              className="px-2 py-1 rounded bg-surface hover:bg-border/60 border border-border/50 text-fg text-[9.5px] font-bold"
+            >
+              {isFullscreenWindow ? "⤓ RESTORE" : "⛶ MAX"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tickers & Indicator Controls Toolbar */}
+      <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-[#080d14] border-b border-border/40 text-[9px] gap-2">
         {/* Tickers */}
         <div className="flex items-center gap-1">
           {TICKER_BUTTONS.map((t) => {
-            const isSelected =
-              activeSymbol === t.id ||
-              (t.id === "XAUUSD" && (activeSymbol === "GOLD" || activeSymbol === "XAU"));
+            const isSelected = activeSymbol === t.id || (t.id === "XAUUSD" && (activeSymbol === "GOLD" || activeSymbol === "XAU"));
             return (
               <button
                 key={t.id}
                 onClick={() => setActiveSymbol(t.id)}
-                className={`px-2.5 py-1 rounded transition font-bold ${
-                  isSelected
-                    ? "bg-accent text-bg shadow-md"
-                    : "bg-surface border border-border/40 text-muted hover:text-accent"
+                className={`px-2 py-0.5 rounded transition font-bold text-[9px] ${
+                  isSelected ? "bg-accent text-bg shadow-sm" : "bg-surface border border-border/40 text-muted hover:text-accent"
                 }`}
               >
                 {t.label}
@@ -809,127 +924,82 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
             );
           })}
         </div>
-      </div>
 
-      {/* Indicator Controls & Live OHLC HUD Bar */}
-      <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-bg/80 border-b border-border/30 text-[9.5px] gap-2">
-        {/* Indicator Toggles */}
+        {/* Indicators */}
         <div className="flex items-center gap-1 flex-wrap">
           <button
-            onClick={() => {
-              if (!isVipUser) {
-                setPaywallFeature("AI Order Block Trade Targets (Entry, SL, TP)");
-                return;
-              }
-              setShowAiSetup(!showAiSetup);
-            }}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("AI Order Block Trade Targets"); return; } setShowAiSetup(!showAiSetup); }}
             className={`px-2 py-0.5 rounded transition font-bold border flex items-center gap-1 ${
-              isVipUser && showAiSetup
-                ? "bg-accent/20 border-accent text-accent shadow-sm"
-                : "border-border/40 text-muted hover:text-fg opacity-80"
+              isVipUser && showAiSetup ? "bg-accent/20 border-accent text-accent" : "border-border/40 text-muted hover:text-fg"
             }`}
           >
             <span>🎯 AI TARGETS</span>
             {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
           </button>
-          <button
-            onClick={() => {
-              if (!isVipUser) {
-                setPaywallFeature("1-Click Institutional Trade Execution Router");
-                return;
-              }
-              setShowExecutionModal(true);
-            }}
-            className={`px-2.5 py-0.5 rounded transition font-extrabold flex items-center gap-1 ${
-              isVipUser
-                ? "bg-gradient-to-r from-accent to-emerald-400 text-bg shadow-sm hover:brightness-110 active:scale-95"
-                : "bg-surface/80 border border-border/50 text-muted hover:text-yellow-400"
-            }`}
-          >
-            <span>⚡ EXECUTE AI SETUP</span>
-            {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
-          </button>
-          <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("Dual EMA 20/50 Trend Ribbons"); return; } setShowEma(!showEma); }}
-            className={`px-2 py-0.5 rounded transition font-bold border flex items-center gap-1 ${
-              isVipUser && showEma
-                ? "bg-cyan-500/20 border-cyan-400 text-cyan-300"
-                : "border-border/40 text-muted hover:text-fg opacity-80"
-            }`}
-          >
-            <span>📈 EMA 20/50</span>
-            {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
-          </button>
-          <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("Bollinger Bands Volatility Clouds"); return; } setShowBollinger(!showBollinger); }}
-            className={`px-2 py-0.5 rounded transition font-bold border flex items-center gap-1 ${
-              isVipUser && showBollinger
-                ? "bg-purple-500/20 border-purple-400 text-purple-300"
-                : "border-border/40 text-muted hover:text-fg opacity-80"
-            }`}
-          >
-            <span>🌐 BOLLINGER</span>
-            {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
-          </button>
-          <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("Institutional VWAP Benchmark"); return; } setShowVwap(!showVwap); }}
-            className={`px-2 py-0.5 rounded transition font-bold border flex items-center gap-1 ${
-              isVipUser && showVwap
-                ? "bg-yellow-500/20 border-yellow-400 text-yellow-300"
-                : "border-border/40 text-muted hover:text-fg opacity-80"
-            }`}
-          >
-            <span>⚡ VWAP</span>
-            {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
-          </button>
-          <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("RSI (14) Momentum Oscillator"); return; } setShowRsi(!showRsi); }}
-            className={`px-2 py-0.5 rounded transition font-bold border flex items-center gap-1 ${
-              isVipUser && showRsi
-                ? "bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-300"
-                : "border-border/40 text-muted hover:text-fg opacity-80"
-            }`}
-          >
-            <span>📊 RSI (14)</span>
-            {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
-          </button>
-        </div>
 
-        {/* Special Indicator Dropdown Selector */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[9px] text-accent font-bold">⚡ SPECIAL INDICATOR:</span>
+          <button
+            onClick={() => { if (!isVipUser) { setPaywallFeature("1-Click Institutional Trade Execution"); return; } setShowExecutionModal(true); }}
+            className={`px-2 py-0.5 rounded transition font-extrabold flex items-center gap-1 ${
+              isVipUser ? "bg-gradient-to-r from-accent to-emerald-400 text-bg shadow-sm hover:brightness-110" : "bg-surface/80 border border-border/50 text-muted"
+            }`}
+          >
+            <span>⚡ EXECUTE</span>
+            {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
+          </button>
+
+          <button
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Dual EMA 20/50"); return; } setShowEma(!showEma); }}
+            className={`px-2 py-0.5 rounded transition font-bold border ${showEma ? "bg-cyan-500/20 border-cyan-400 text-cyan-300" : "border-border/40 text-muted"}`}
+          >
+            EMA 20/50
+          </button>
+
+          <button
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Bollinger Bands"); return; } setShowBollinger(!showBollinger); }}
+            className={`px-2 py-0.5 rounded transition font-bold border ${showBollinger ? "bg-purple-500/20 border-purple-400 text-purple-300" : "border-border/40 text-muted"}`}
+          >
+            BOLL
+          </button>
+
+          <button
+            onClick={() => { if (!isVipUser) { setPaywallFeature("VWAP"); return; } setShowVwap(!showVwap); }}
+            className={`px-2 py-0.5 rounded transition font-bold border ${showVwap ? "bg-yellow-500/20 border-yellow-400 text-yellow-300" : "border-border/40 text-muted"}`}
+          >
+            VWAP
+          </button>
+
+          <button
+            onClick={() => { if (!isVipUser) { setPaywallFeature("RSI (14)"); return; } setShowRsi(!showRsi); }}
+            className={`px-2 py-0.5 rounded transition font-bold border ${showRsi ? "bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-300" : "border-border/40 text-muted"}`}
+          >
+            RSI
+          </button>
+
+          {/* Special Indicator Selector */}
           <select
             value={specialIndicator}
             onChange={(e) => {
               const val = e.target.value as any;
               if (!isVipUser && val !== "none") {
-                const labels: Record<string, string> = {
-                  cvd: "Cumulative Volume Delta (CVD & Absorption)",
-                  gex: "Dealer Gamma Exposure (GEX & Volatility Walls)",
-                  anchored_vwap: "Anchored VWAP + SD Envelope (±1σ, ±2σ)",
-                  micro_price: "Volume-Weighted Micro-Price (P_micro)",
-                  fvg: "Fair Value Gaps (FVG) & Order Blocks",
-                  godmode_v3: "Godmode V3 Hybrid Oscillator (WaveTrend + MFI)",
-                };
-                setPaywallFeature(labels[val] || "Institutional Special Indicator");
+                setPaywallFeature("Institutional Special Indicators");
                 return;
               }
               setSpecialIndicator(val);
             }}
-            className="bg-surface/90 border border-border/70 text-accent font-mono text-[9px] rounded px-2 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
+            className="bg-surface/90 border border-border/70 text-accent font-mono text-[8.5px] rounded px-1.5 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
           >
-            <option value="none">-- Standard Candlesticks --</option>
-            <option value="cvd">🌊 Cumulative Volume Delta (CVD) {!isVipUser ? "🔒" : ""}</option>
-            <option value="gex">⚡ Dealer Gamma Exposure (GEX) {!isVipUser ? "🔒" : ""}</option>
-            <option value="anchored_vwap">🎯 Anchored VWAP Envelope (±1σ, ±2σ) {!isVipUser ? "🔒" : ""}</option>
-            <option value="micro_price">🔬 Micro-Price Order Book Drift {!isVipUser ? "🔒" : ""}</option>
-            <option value="fvg">🧱 Fair Value Gaps (FVG) {!isVipUser ? "🔒" : ""}</option>
-            <option value="godmode_v3">🔮 Godmode V3 Hybrid Oscillator {!isVipUser ? "🔒" : ""}</option>
+            <option value="none">-- Special Indicators --</option>
+            <option value="cvd">🌊 CVD Delta Flow {!isVipUser ? "🔒" : ""}</option>
+            <option value="gex">⚡ GEX Walls {!isVipUser ? "🔒" : ""}</option>
+            <option value="anchored_vwap">🎯 Anchored VWAP {!isVipUser ? "🔒" : ""}</option>
+            <option value="micro_price">🔬 Micro-Price {!isVipUser ? "🔒" : ""}</option>
+            <option value="fvg">🧱 FVG Imbalances {!isVipUser ? "🔒" : ""}</option>
+            <option value="godmode_v3">🔮 Godmode V3 {!isVipUser ? "🔒" : ""}</option>
           </select>
         </div>
 
         {/* Live Candle OHLC HUD */}
-        <div className="flex items-center gap-2.5 text-muted">
+        <div className="flex items-center gap-2 text-muted">
           <span>O: <strong className="text-fg">${activeCandle.open}</strong></span>
           <span>H: <strong className="text-fg">${activeCandle.high}</strong></span>
           <span>L: <strong className="text-fg">${activeCandle.low}</strong></span>
@@ -938,28 +1008,83 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         </div>
       </div>
 
-      {/* Main Canvas Area */}
-      <div className="relative w-full flex-1 min-h-[380px] bg-[#04060a]">
-        <canvas
-          ref={canvasRef}
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onMouseMove={(e) => {
-            if (isDragging) {
-              const diff = e.clientX - dragStartX;
-              if (Math.abs(diff) > 8) {
-                setPanOffset((p) => Math.max(0, p + (diff > 0 ? 1 : -1)));
-                setDragStartX(e.clientX);
+      {/* Main Canvas & Side Order Book Split Body */}
+      <div className="flex-1 flex w-full relative min-h-[380px] bg-[#06090e]">
+        {/* Candlestick Canvas Area */}
+        <div className="flex-1 relative h-full">
+          <canvas
+            ref={canvasRef}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseMove={(e) => {
+              if (isDragging) {
+                const diff = e.clientX - dragStartX;
+                if (Math.abs(diff) > 8) {
+                  setPanOffset((p) => Math.max(0, p + (diff > 0 ? 1 : -1)));
+                  setDragStartX(e.clientX);
+                }
               }
-            }
-            handleMouseMove(e);
-          }}
-          onMouseLeave={handleCanvasLeave}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          className="w-full h-full cursor-crosshair block select-none"
-        />
+              handleMouseMove(e);
+            }}
+            onMouseLeave={handleCanvasLeave}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="w-full h-full cursor-crosshair block select-none"
+          />
+        </div>
+
+        {/* Webull Level 2 Order Book Depth Ladder (DOM) */}
+        {showOrderBookDOM && (
+          <div className="w-[180px] sm:w-[190px] bg-[#070b12] border-l border-border/50 flex flex-col justify-between p-2.5 text-[9px] font-mono select-none">
+            <div>
+              <div className="flex items-center justify-between pb-1 border-b border-border/40 text-[8.5px] text-muted uppercase">
+                <span>ORDER BOOK L2</span>
+                <span className="text-accent font-bold">DEPTH</span>
+              </div>
+
+              {/* Asks (Sells) */}
+              <div className="space-y-1 pt-1.5">
+                <div className="text-[8px] text-red-400/80 font-bold uppercase">Asks (Sell Queue)</div>
+                {orderBookDOM.asks.slice(0, 4).reverse().map((a, i) => (
+                  <div key={i} className="flex items-center justify-between relative overflow-hidden px-1 py-0.5 rounded bg-red-500/5">
+                    <div className="absolute right-0 top-0 bottom-0 bg-red-500/15" style={{ width: `${Math.min(100, (a.size / 5000) * 100)}%` }} />
+                    <span className="text-red-400 font-bold relative z-10">${a.price.toFixed(2)}</span>
+                    <span className="text-muted relative z-10">{a.size.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Spread Banner */}
+              <div className="my-2 py-1 text-center bg-surface/80 rounded border border-border/40 font-bold text-fg text-[9px]">
+                SPREAD: ${(orderBookDOM.asks[0]?.price - orderBookDOM.bids[0]?.price || 0.05).toFixed(2)}
+              </div>
+
+              {/* Bids (Buys) */}
+              <div className="space-y-1">
+                <div className="text-[8px] text-green-400/80 font-bold uppercase">Bids (Buy Queue)</div>
+                {orderBookDOM.bids.slice(0, 4).map((b, i) => (
+                  <div key={i} className="flex items-center justify-between relative overflow-hidden px-1 py-0.5 rounded bg-green-500/5">
+                    <div className="absolute right-0 top-0 bottom-0 bg-green-500/15" style={{ width: `${Math.min(100, (b.size / 5000) * 100)}%` }} />
+                    <span className="text-green-400 font-bold relative z-10">${b.price.toFixed(2)}</span>
+                    <span className="text-muted relative z-10">{b.size.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Buying vs Selling Pressure Gauge */}
+            <div className="pt-2 border-t border-border/40">
+              <div className="flex justify-between text-[8px] text-muted mb-1 font-bold">
+                <span className="text-green-400">BIDS {orderBookDOM.bidPct}%</span>
+                <span className="text-red-400">ASKS {orderBookDOM.askPct}%</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-red-500/30 overflow-hidden flex">
+                <div className="h-full bg-green-400" style={{ width: `${orderBookDOM.bidPct}%` }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Paywall Modal for Locked Features */}
