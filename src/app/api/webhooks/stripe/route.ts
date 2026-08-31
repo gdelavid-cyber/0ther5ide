@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       const session = event.data.object as any;
       const email = session.customer_email || session.customer_details?.email;
       if (email) {
-        db.upsertUser({
+        await db.upsertUser({
           email,
           planTier: "vip",
           stripeCustomerId: session.customer,
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       // Revert user to recon on cancellation
       const email = subscription.customer_email;
       if (email) {
-        db.upsertUser({ email, planTier: "recon" });
+        await db.upsertUser({ email, planTier: "recon" });
       }
     }
 

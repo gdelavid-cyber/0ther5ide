@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Instant Demo / Zero-Config Unlock Fallback
-    const updatedUser = db.upsertUser({
+    const updatedUser = await db.upsertUser({
       email,
       planTier: planTier === "vip" ? "vip" : "recon",
     });
