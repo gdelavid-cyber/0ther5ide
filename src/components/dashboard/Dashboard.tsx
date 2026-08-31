@@ -48,6 +48,28 @@ export default function Dashboard() {
       const stored = localStorage.getItem("0ther5ide_user_tier");
       if (stored === "vip") setPlanTierState("vip");
     } catch {}
+
+    // Auto-verify Stripe Session on Redirect (Zero-Webhook Configuration Needed)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const sessionId = params.get("session_id");
+      const tabParam = params.get("tab");
+      if (tabParam) setActiveTab(tabParam);
+
+      if (sessionId) {
+        fetch(`/api/checkout?session_id=${encodeURIComponent(sessionId)}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.success && data.tier === "vip") {
+              setPlanTier("vip");
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            window.history.replaceState({}, "", "/");
+          });
+      }
+    }
   }, []);
   const [user, setUser] = useState<{ name: string; email: string; avatar: string } | null>(null);
 
