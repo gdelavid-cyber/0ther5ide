@@ -178,23 +178,10 @@ export default function AgentChat() {
             >
               {m.content}
 
-              {/* Inline Live TradingView Candlestick Chart if Ticker Present */}
+              {/* Inline Live TradingView Candlestick Chart — Instant Real-Time Feed */}
               {m.chartSymbol && (
-                <div className="mt-3 mb-1 w-full">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] text-accent font-bold font-mono">📈 LIVE MARKET STREAM: {m.chartSymbol}</span>
-                    <button
-                      onClick={() => setActiveChartSymbol(activeChartSymbol === m.chartSymbol ? null : m.chartSymbol!)}
-                      className="text-[9px] font-mono px-2 py-0.5 rounded bg-surface border border-border/50 hover:border-accent text-muted hover:text-accent transition"
-                    >
-                      {activeChartSymbol === m.chartSymbol ? "▲ HIDE CHART" : "▼ EXPAND CHART"}
-                    </button>
-                  </div>
-                  {activeChartSymbol === m.chartSymbol && (
-                    <div className="animate-fade-in">
-                      <LiveTradingViewChart symbol={m.chartSymbol} height={260} />
-                    </div>
-                  )}
+                <div className="mt-3 mb-1 w-full animate-fade-in">
+                  <LiveTradingViewChart symbol={m.chartSymbol} height={280} />
                 </div>
               )}
 
