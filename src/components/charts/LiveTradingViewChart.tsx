@@ -131,7 +131,7 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     } catch {}
   }, []);
 
-  // Floating Window Drag Handlers
+  // Floating Window Drag Handlers (Unrestricted Screen Placement)
   const handleWindowPointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest("button") || target.closest("select") || target.closest("canvas")) return;
@@ -151,8 +151,9 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     if (!isWindowDraggingRef.current) return;
     const deltaX = e.clientX - windowDragStartRef.current.mouseX;
     const deltaY = e.clientY - windowDragStartRef.current.mouseY;
-    const newX = Math.max(10, Math.min(window.innerWidth - 300, windowDragStartRef.current.startX + deltaX));
-    const newY = Math.max(10, Math.min(window.innerHeight - 200, windowDragStartRef.current.startY + deltaY));
+    // Unrestricted screen movement with generous safety margin
+    const newX = Math.max(-500, Math.min(window.innerWidth - 80, windowDragStartRef.current.startX + deltaX));
+    const newY = Math.max(0, Math.min(window.innerHeight - 80, windowDragStartRef.current.startY + deltaY));
     setFloatingPos({ x: newX, y: newY });
   };
 
@@ -160,47 +161,27 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
     isWindowDraggingRef.current = false;
   };
 
-  // ResizeObserver for dynamic, responsive container adaptation
+  // ResizeObserver for dynamic, responsive container adaptation to every scale
   useEffect(() => {
-    const updateSize = () => {
-      if (isFloating) {
-        if (isFullscreenWindow) {
-          setCanvasDimensions({
-            width: window.innerWidth - (showOrderBookDOM ? 240 : 40),
-            height: window.innerHeight - 140,
-          });
-        } else {
-          setCanvasDimensions({
-            width: Math.min(window.innerWidth - 60, showOrderBookDOM ? 780 : 620),
-            height: 500,
-          });
-        }
-        return;
-      }
-      if (containerRef.current) {
-        const w = containerRef.current.clientWidth;
+    const targetElem = isFloating ? floatingWindowRef.current : containerRef.current;
+    if (!targetElem) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
         if (w > 0) {
+          const domWidth = showOrderBookDOM ? (w > 640 ? 190 : 130) : 0;
           setCanvasDimensions({
-            width: Math.floor(w - (showOrderBookDOM ? 190 : 0)),
-            height: height || 440,
+            width: Math.max(280, Math.floor(w - domWidth)),
+            height: Math.max(220, Math.floor(isFloating ? (h > 140 ? h - 110 : 480) : (height || 440))),
           });
         }
       }
-    };
+    });
 
-    updateSize();
-    window.addEventListener("resize", updateSize);
-
-    if (containerRef.current && !isFloating) {
-      const observer = new ResizeObserver(updateSize);
-      observer.observe(containerRef.current);
-      return () => {
-        observer.disconnect();
-        window.removeEventListener("resize", updateSize);
-      };
-    }
-
-    return () => window.removeEventListener("resize", updateSize);
+    observer.observe(targetElem);
+    return () => observer.disconnect();
   }, [height, isFloating, isFullscreenWindow, showOrderBookDOM]);
 
   // Fetch Live Real Data from API
@@ -747,7 +728,59 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [visibleCandles, livePrice, liveChange, canvasDimensions, showAiSetup, showEma, showBollinger, showVwap, showRsi, specialIndicator, mousePos]);
+
+    // 7. Webull-Style On-Canvas Active Indicator Legend Overlay (Top-Left)
+    let legendX = 14;
+    const legendY = 16;
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "left";
+
+    // Symbol & Interval Watermark Header Badge
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.fillText(`${activeSymbol} · ${timeframe}`, legendX, legendY);
+    legendX += ctx.measureText(`${activeSymbol} · ${timeframe}`).width + 12;
+
+    if (showEma && legendX < w - 160) {
+      ctx.fillStyle = "#00e5ff";
+      ctx.fillText("EMA 20", legendX, legendY);
+      legendX += ctx.measureText("EMA 20").width + 8;
+
+      ctx.fillStyle = "#ffd700";
+      ctx.fillText("EMA 50", legendX, legendY);
+      legendX += ctx.measureText("EMA 50").width + 10;
+    }
+
+    if (showBollinger && legendX < w - 160) {
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillText("BOLL(20,2)", legendX, legendY);
+      legendX += ctx.measureText("BOLL(20,2)").width + 10;
+    }
+
+    if (showVwap && legendX < w - 140) {
+      ctx.fillStyle = "#f59e0b";
+      ctx.fillText("VWAP", legendX, legendY);
+      legendX += ctx.measureText("VWAP").width + 10;
+    }
+
+    if (showAiSetup && legendX < w - 160) {
+      ctx.fillStyle = "#00ff88";
+      ctx.fillText("🎯 AI TARGETS ACTIVE", legendX, legendY);
+      legendX += ctx.measureText("🎯 AI TARGETS ACTIVE").width + 10;
+    }
+
+    if (specialIndicator !== "none" && legendX < w - 140) {
+      const specLabels: Record<string, string> = {
+        cvd: "🌊 CVD ACTIVE",
+        gex: "⚡ GEX ACTIVE",
+        anchored_vwap: "🎯 AVWAP",
+        micro_price: "🔬 MICRO-PRICE",
+        fvg: "🧱 FVG ACTIVE",
+        godmode_v3: "🔮 GODMODE V3",
+      };
+      ctx.fillStyle = "#e040fb";
+      ctx.fillText(specLabels[specialIndicator] || specialIndicator.toUpperCase(), legendX, legendY);
+    }
+  }, [visibleCandles, livePrice, liveChange, canvasDimensions, showAiSetup, showEma, showBollinger, showVwap, showRsi, specialIndicator, mousePos, activeSymbol, timeframe]);
 
   // Handle Mouse Move for Interactive Crosshair
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -800,8 +833,13 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
           left: floatingPos ? `${floatingPos.x}px` : "calc(50vw - 460px)",
           top: floatingPos ? `${floatingPos.y}px` : "70px",
           zIndex: 99999,
-          width: showOrderBookDOM ? "940px" : "740px",
-          maxWidth: "96vw",
+          width: showOrderBookDOM ? "960px" : "760px",
+          minWidth: "340px",
+          minHeight: "380px",
+          maxWidth: "98vw",
+          maxHeight: "96vh",
+          resize: "both",
+          overflow: "hidden",
           boxShadow: "0 25px 80px -15px rgba(0, 0, 0, 0.95), 0 0 40px rgba(0, 255, 136, 0.25)",
         }
     : {};
@@ -926,76 +964,85 @@ export default function LiveTradingViewChart({ symbol = "NVDA", height = 440 }: 
         </div>
 
         {/* Indicators */}
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("AI Order Block Trade Targets"); return; } setShowAiSetup(!showAiSetup); }}
-            className={`px-2 py-0.5 rounded transition font-bold border flex items-center gap-1 ${
-              isVipUser && showAiSetup ? "bg-accent/20 border-accent text-accent" : "border-border/40 text-muted hover:text-fg"
+            onClick={() => { if (!isVipUser) { setPaywallFeature("AI Order Block Targets (Entry, SL, TP)"); return; } setShowAiSetup(!showAiSetup); }}
+            className={`px-2 py-0.5 rounded transition font-bold border flex items-center gap-1 text-[9px] ${
+              isVipUser && showAiSetup ? "bg-accent/20 border-accent text-accent shadow-sm" : "border-border/40 text-muted hover:text-fg"
             }`}
+            title="Toggle AI Algorithmic Order Block Targets"
           >
             <span>🎯 AI TARGETS</span>
             {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
           </button>
 
           <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("1-Click Institutional Trade Execution"); return; } setShowExecutionModal(true); }}
-            className={`px-2 py-0.5 rounded transition font-extrabold flex items-center gap-1 ${
+            onClick={() => { if (!isVipUser) { setPaywallFeature("1-Click Trade Execution Console"); return; } setShowExecutionModal(true); }}
+            className={`px-2.5 py-0.5 rounded transition font-extrabold flex items-center gap-1 text-[9px] ${
               isVipUser ? "bg-gradient-to-r from-accent to-emerald-400 text-bg shadow-sm hover:brightness-110" : "bg-surface/80 border border-border/50 text-muted"
             }`}
+            title="Open 1-Click Institutional Trade Execution Router"
           >
             <span>⚡ EXECUTE</span>
             {!isVipUser && <span className="text-[8px] text-yellow-400">🔒</span>}
           </button>
 
           <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("Dual EMA 20/50"); return; } setShowEma(!showEma); }}
-            className={`px-2 py-0.5 rounded transition font-bold border ${showEma ? "bg-cyan-500/20 border-cyan-400 text-cyan-300" : "border-border/40 text-muted"}`}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Dual EMA 20/50 Trend Ribbons"); return; } setShowEma(!showEma); }}
+            className={`px-2 py-0.5 rounded transition font-bold border text-[9px] ${showEma ? "bg-cyan-500/20 border-cyan-400 text-cyan-300" : "border-border/40 text-muted hover:text-fg"}`}
+            title="Toggle Dual EMA 20 (Cyan) & EMA 50 (Gold)"
           >
-            EMA 20/50
+            📈 EMA 20/50
           </button>
 
           <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("Bollinger Bands"); return; } setShowBollinger(!showBollinger); }}
-            className={`px-2 py-0.5 rounded transition font-bold border ${showBollinger ? "bg-purple-500/20 border-purple-400 text-purple-300" : "border-border/40 text-muted"}`}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Bollinger Bands (20, 2) Volatility Clouds"); return; } setShowBollinger(!showBollinger); }}
+            className={`px-2 py-0.5 rounded transition font-bold border text-[9px] ${showBollinger ? "bg-purple-500/20 border-purple-400 text-purple-300" : "border-border/40 text-muted hover:text-fg"}`}
+            title="Toggle Bollinger Bands (20, 2) Volatility Clouds"
           >
-            BOLL
+            🌐 BOLL (20,2)
           </button>
 
           <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("VWAP"); return; } setShowVwap(!showVwap); }}
-            className={`px-2 py-0.5 rounded transition font-bold border ${showVwap ? "bg-yellow-500/20 border-yellow-400 text-yellow-300" : "border-border/40 text-muted"}`}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("Institutional VWAP Benchmark"); return; } setShowVwap(!showVwap); }}
+            className={`px-2 py-0.5 rounded transition font-bold border text-[9px] ${showVwap ? "bg-yellow-500/20 border-yellow-400 text-yellow-300" : "border-border/40 text-muted hover:text-fg"}`}
+            title="Toggle Institutional VWAP Benchmark"
           >
-            VWAP
+            ⚡ VWAP
           </button>
 
           <button
-            onClick={() => { if (!isVipUser) { setPaywallFeature("RSI (14)"); return; } setShowRsi(!showRsi); }}
-            className={`px-2 py-0.5 rounded transition font-bold border ${showRsi ? "bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-300" : "border-border/40 text-muted"}`}
+            onClick={() => { if (!isVipUser) { setPaywallFeature("RSI (14) Momentum Oscillator"); return; } setShowRsi(!showRsi); }}
+            className={`px-2 py-0.5 rounded transition font-bold border text-[9px] ${showRsi ? "bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-300" : "border-border/40 text-muted hover:text-fg"}`}
+            title="Toggle RSI (14) Momentum Sub-Panel"
           >
-            RSI
+            📊 RSI (14)
           </button>
 
           {/* Special Indicator Selector */}
-          <select
-            value={specialIndicator}
-            onChange={(e) => {
-              const val = e.target.value as any;
-              if (!isVipUser && val !== "none") {
-                setPaywallFeature("Institutional Special Indicators");
-                return;
-              }
-              setSpecialIndicator(val);
-            }}
-            className="bg-surface/90 border border-border/70 text-accent font-mono text-[8.5px] rounded px-1.5 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
-          >
-            <option value="none">-- Special Indicators --</option>
-            <option value="cvd">🌊 CVD Delta Flow {!isVipUser ? "🔒" : ""}</option>
-            <option value="gex">⚡ GEX Walls {!isVipUser ? "🔒" : ""}</option>
-            <option value="anchored_vwap">🎯 Anchored VWAP {!isVipUser ? "🔒" : ""}</option>
-            <option value="micro_price">🔬 Micro-Price {!isVipUser ? "🔒" : ""}</option>
-            <option value="fvg">🧱 FVG Imbalances {!isVipUser ? "🔒" : ""}</option>
-            <option value="godmode_v3">🔮 Godmode V3 {!isVipUser ? "🔒" : ""}</option>
-          </select>
+          <div className="flex items-center gap-1 bg-surface/80 px-1 py-0.5 rounded border border-border/60">
+            <span className="text-[8.5px] text-accent font-bold">⚡ SPECIAL:</span>
+            <select
+              value={specialIndicator}
+              onChange={(e) => {
+                const val = e.target.value as any;
+                if (!isVipUser && val !== "none") {
+                  setPaywallFeature("Institutional Special Indicators");
+                  return;
+                }
+                setSpecialIndicator(val);
+              }}
+              className="bg-transparent text-accent font-mono text-[8.5px] font-bold focus:outline-none cursor-pointer"
+            >
+              <option value="none" className="bg-[#06090e] text-muted">-- None --</option>
+              <option value="cvd" className="bg-[#06090e] text-accent">🌊 CVD Flow {!isVipUser ? "🔒" : ""}</option>
+              <option value="gex" className="bg-[#06090e] text-accent">⚡ GEX Walls {!isVipUser ? "🔒" : ""}</option>
+              <option value="anchored_vwap" className="bg-[#06090e] text-accent">🎯 Anchored VWAP {!isVipUser ? "🔒" : ""}</option>
+              <option value="micro_price" className="bg-[#06090e] text-accent">🔬 Micro-Price {!isVipUser ? "🔒" : ""}</option>
+              <option value="fvg" className="bg-[#06090e] text-accent">🧱 FVG Gaps {!isVipUser ? "🔒" : ""}</option>
+              <option value="godmode_v3" className="bg-[#06090e] text-accent">🔮 Godmode V3 {!isVipUser ? "🔒" : ""}</option>
+            </select>
+          </div>
         </div>
 
         {/* Live Candle OHLC HUD */}
