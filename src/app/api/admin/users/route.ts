@@ -39,6 +39,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized: Invalid admin key" }, { status: 401 });
     }
 
+    if (action === "sync" && Array.isArray(body.users)) {
+      const synced = await db.bulkUpsertUsers(body.users);
+      const allUsers = await db.getAllUsers();
+      return NextResponse.json({
+        success: true,
+        message: `Synced ${synced.length} user records to persistent database`,
+        users: allUsers,
+      });
+    }
+
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
