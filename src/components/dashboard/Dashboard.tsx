@@ -15,6 +15,7 @@ import OrderFlowPanel from "./OrderFlowPanel";
 import SwarmConsole from "@/components/swarm/SwarmConsole";
 import PricingView from "@/components/pricing/PricingView";
 import AdminConsole from "@/components/admin/AdminConsole";
+import BacktestConsole from "@/components/backtest/BacktestConsole";
 import LockedFeatureView from "@/components/pricing/LockedFeatureView";
 import NewsTicker from "./NewsTicker";
 import type { Signal, TensionIndex as TensionType } from "@/lib/types";
@@ -358,6 +359,12 @@ export default function Dashboard() {
         )}
 
 
+
+        {activeTab === "backtest" && (
+          <div className="min-h-[700px]">
+            <BacktestConsole />
+          </div>
+        )}
 
         {activeTab === "admin" && (
           <div className="min-h-[700px]">

@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { id: "insiders", label: "INSIDERS", icon: "⚲", isLocked: true },
   { id: "intel", label: "INTEL", icon: "◆", isLocked: true },
   { id: "swarm", label: "SWARM", icon: "🛰️", isLocked: true },
+  { id: "backtest", label: "BACKTEST", icon: "📊", isLocked: false },
   { id: "pricing", label: "ELITE PASS", icon: "👑", isLocked: false },
   { id: "admin", label: "ADMIN", icon: "⚙", isLocked: false },
 ];
