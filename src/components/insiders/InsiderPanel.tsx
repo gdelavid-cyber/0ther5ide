@@ -7,6 +7,8 @@ import type { InsiderTrade, InsiderDossier } from "@/lib/types";
 
 const TRENDING_EXECUTIVES = [
   "ALL",
+  "KRISTEN COOK",
+  "BCO",
   "JENSEN HUANG",
   "ELON MUSK",
   "MARK ZUCKERBERG",
@@ -16,12 +18,19 @@ const TRENDING_EXECUTIVES = [
   "WARREN BUFFETT",
 ];
 
+const DEFAULT_TARGET_SEC_URL = "https://www.sec.gov/Archives/edgar/data/2079520/000207952026000024/";
+
 export default function InsiderPanel() {
   const [trades, setTrades] = useState<InsiderTrade[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [selectedDossier, setSelectedDossier] = useState<InsiderDossier | null>(null);
+
+  // Custom SEC EDGAR URL Pull State
+  const [customSecUrl, setCustomSecUrl] = useState("");
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlMsg, setUrlMsg] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const fetchTrades = useCallback(async () => {
     try {
@@ -44,7 +53,19 @@ export default function InsiderPanel() {
       const res = await fetch("/api/insider/" + trade.cik);
       if (res.ok) {
         const data = await res.json();
-        setSelectedDossier(data);
+        setSelectedDossier({
+          ...data,
+          company: trade.company,
+          latest: {
+            side: trade.action,
+            ticker: trade.ticker,
+            shares: trade.shares,
+            price: trade.price,
+            value: trade.value,
+            action: trade.action.toUpperCase(),
+          },
+          timeline: [trade, ...(data.timeline || []).filter((t: any) => t.id !== trade.id)],
+        });
         return;
       }
     } catch {}
@@ -53,12 +74,12 @@ export default function InsiderPanel() {
     setSelectedDossier({
       name: trade.person,
       codename: "TARGET-" + trade.ticker,
-      cik: trade.cik || "0001045810",
+      cik: trade.cik || "0002079520",
       totalFilings: 18,
       ytdVolume: trade.value * 3.4,
       ytdNet: trade.action === "buy" ? trade.value : -trade.value,
       topTickers: [{ ticker: trade.ticker, value: trade.value }],
-      firstSeen: "2021-04-12",
+      firstSeen: "2023-01-15",
       lastActive: trade.filedAt,
       company: trade.company,
       latest: {
@@ -67,21 +88,58 @@ export default function InsiderPanel() {
         shares: trade.shares,
         price: trade.price,
         value: trade.value,
-        action: trade.action,
+        action: trade.action.toUpperCase(),
       },
       timeline: [trade],
     });
   };
 
+  const handlePullDirectSecUrl = async (urlOverride?: string) => {
+    const target = (urlOverride || customSecUrl || DEFAULT_TARGET_SEC_URL).trim();
+    if (!target) return;
+
+    setUrlLoading(true);
+    setUrlMsg(null);
+    try {
+      const res = await fetch("/api/insiders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: target }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.trade) {
+        const parsedTrade: InsiderTrade = data.trade;
+        setTrades((prev) => [parsedTrade, ...prev.filter((t) => t.id !== parsedTrade.id)]);
+        setUrlMsg({ text: "✓ Successfully parsed Form 4: " + parsedTrade.person + " (" + parsedTrade.ticker + ") $" + parsedTrade.value.toLocaleString() });
+        setCustomSecUrl("");
+        openDossier(parsedTrade);
+        setTimeout(() => setUrlMsg(null), 5000);
+      } else {
+        setUrlMsg({ text: data.error || "Failed to parse Form 4 from SEC URL", isError: true });
+      }
+    } catch (err: any) {
+      setUrlMsg({ text: err.message || "Network error fetching SEC filing", isError: true });
+    }
+    setUrlLoading(false);
+  };
+
   const filteredTrades = trades.filter((t) => {
     const q = searchQuery.toLowerCase().trim();
-    const matchesSearch = !q || t.person.toLowerCase().includes(q) || t.ticker.toLowerCase().includes(q) || t.company.toLowerCase().includes(q);
-    const matchesFilter = activeFilter === "ALL" || t.person.toUpperCase().includes(activeFilter);
+    const matchesSearch =
+      !q ||
+      t.person.toLowerCase().includes(q) ||
+      t.ticker.toLowerCase().includes(q) ||
+      t.company.toLowerCase().includes(q);
+    const matchesFilter =
+      activeFilter === "ALL" ||
+      t.person.toUpperCase().includes(activeFilter) ||
+      t.ticker.toUpperCase().includes(activeFilter);
     return matchesSearch && matchesFilter;
   });
 
   return (
-    <div className="glass-panel p-4 flex flex-col h-full glow-border space-y-2.5">
+    <div className="glass-panel p-4 flex flex-col h-full glow-border space-y-2.5 font-mono">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border/30">
         <div className="flex items-center gap-2">
@@ -91,9 +149,47 @@ export default function InsiderPanel() {
             EDGAR REAL-TIME
           </span>
         </div>
-        <span className="text-[10px] text-muted font-mono">
+        <span className="text-[10px] text-muted">
           {filteredTrades.length} Active Filings
         </span>
+      </div>
+
+      {/* Direct SEC EDGAR URL Ingestion Bar */}
+      <div className="p-2 rounded-xl bg-surface/50 border border-border/50 space-y-1.5">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-accent font-bold flex items-center gap-1">
+            <span>⚡ PULL DIRECT SEC EDGAR URL</span>
+          </span>
+          <button
+            onClick={() => handlePullDirectSecUrl(DEFAULT_TARGET_SEC_URL)}
+            className="text-[9px] text-emerald-400 hover:underline flex items-center gap-1 font-bold"
+          >
+            <span>+ PULL KRISTEN COOK (BCO /2079520/)</span>
+          </button>
+        </div>
+
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={customSecUrl}
+            onChange={(e) => setCustomSecUrl(e.target.value)}
+            placeholder="Paste SEC EDGAR URL (e.g. https://www.sec.gov/Archives/edgar/data/2079520/...)"
+            className="flex-1 bg-bg border border-border/60 text-fg text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-accent"
+          />
+          <button
+            onClick={() => handlePullDirectSecUrl()}
+            disabled={urlLoading}
+            className="px-3 py-1.5 rounded-lg bg-accent text-bg font-extrabold text-xs hover:brightness-110 active:scale-95 transition flex-shrink-0"
+          >
+            {urlLoading ? "PARSING..." : "PARSE URL"}
+          </button>
+        </div>
+
+        {urlMsg && (
+          <div className={"text-[10px] font-bold p-1 rounded " + (urlMsg.isError ? "text-red-400 bg-red-500/10" : "text-emerald-400 bg-emerald-500/10")}>
+            {urlMsg.text}
+          </div>
+        )}
       </div>
 
       {/* Search Input Bar */}
@@ -103,7 +199,7 @@ export default function InsiderPanel() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search executive, company, or ticker (e.g. Jensen, NVDA, Pelosi)..."
+          placeholder="Search executive, company, or ticker (e.g. Kristen, BCO, Jensen, NVDA)..."
           className="w-full bg-surface/80 border border-border/60 text-xs pl-8 pr-8 py-1.5 rounded text-fg placeholder:text-muted focus:border-accent focus:outline-none"
         />
         {searchQuery && (
@@ -117,7 +213,7 @@ export default function InsiderPanel() {
       </div>
 
       {/* Trending Executive Quick Filter Chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[9px] font-mono scrollbar-none">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[9px] scrollbar-none">
         <span className="text-accent font-bold uppercase flex-shrink-0 flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-accent signal-pulse" /> TRENDING:
         </span>
@@ -156,32 +252,39 @@ export default function InsiderPanel() {
               )}
             >
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span
-                    className={"px-1.5 py-0.5 text-[9px] font-bold rounded font-mono " + (
+                    className={"px-1.5 py-0.5 text-[9px] font-bold rounded " + (
                       t.action === "buy"
-                        ? "bg-green-500/20 text-low border border-green-500/40"
-                        : "bg-red-500/20 text-warn border border-red-500/40"
+                        ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                        : "bg-red-500/20 text-red-400 border border-red-500/40"
                     )}
                   >
                     {t.action?.toUpperCase()}
                   </span>
-                  <span className="font-bold text-fg font-mono">{t.ticker}</span>
+                  <span className="font-bold text-fg">{t.ticker}</span>
                   <span className="text-muted text-[11px] truncate max-w-[140px]">{t.company}</span>
                 </div>
-                <span className="text-[10px] text-muted font-mono">{timeAgo(t.filedAt)}</span>
+                <span className="text-[10px] text-muted">{timeAgo(t.filedAt)}</span>
               </div>
 
               <div className="flex items-center justify-between mt-1 text-xs">
-                <span className="font-bold text-fg group-hover:text-accent transition">{t.person}</span>
-                <span className={"font-bold font-mono " + (t.action === "buy" ? "text-low" : "text-warn")}>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-fg group-hover:text-accent transition">{t.person}</span>
+                  {t.role && (
+                    <span className="text-[9px] px-1 rounded bg-surface border border-border/40 text-muted">
+                      {t.role}
+                    </span>
+                  )}
+                </div>
+                <span className={"font-bold " + (t.action === "buy" ? "text-green-400" : "text-red-400")}>
                   {formatMoney(t.value)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between mt-1 text-[10px] text-muted border-t border-border/20 pt-1">
-                <span>{t.shares?.toLocaleString()} shares @ ${t.price?.toFixed(2)}</span>
-                <span className="text-accent opacity-0 group-hover:opacity-100 transition text-[9px] font-bold font-mono">
+                <span>{t.shares?.toLocaleString()} shares @ {"$" + t.price?.toFixed(2)}</span>
+                <span className="text-accent opacity-0 group-hover:opacity-100 transition text-[9px] font-bold">
                   OPEN DOSSIER ▸
                 </span>
               </div>

@@ -15,14 +15,17 @@ async function fetchInsiderDossier(cik: string): Promise<any> {
     } catch (err) {
       logger.warn("SEC CIK dossier fetch failed, using fallback", { cik }, err);
     }
+    const isKristenCook = cik.includes("2079520");
     return {
-      name: cik === "0001045810" ? "Jensen Huang" : cik === "0001318605" ? "Elon Musk" : "Executive Subject",
-      ticker: cik === "0001045810" ? "NVDA" : cik === "0001318605" ? "TSLA" : "CORP",
+      name: isKristenCook ? "Kristen Williams Cook" : cik === "0001045810" ? "Jensen Huang" : cik === "0001318605" ? "Elon Musk" : "Executive Subject",
+      ticker: isKristenCook ? "BCO" : cik === "0001045810" ? "NVDA" : cik === "0001318605" ? "TSLA" : "CORP",
+      role: isKristenCook ? "EVP & CLO" : "Executive Officer",
+      company: isKristenCook ? "The Brink's Company (BRINKS CO)" : undefined,
       filings: {
         recent: {
           form: ["4", "4", "4", "4", "4"],
           filingDate: [
-            new Date().toISOString().split("T")[0],
+            "2026-09-03",
             new Date(Date.now() - 86400000 * 7).toISOString().split("T")[0],
             new Date(Date.now() - 86400000 * 14).toISOString().split("T")[0],
             new Date(Date.now() - 86400000 * 21).toISOString().split("T")[0],
